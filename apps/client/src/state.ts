@@ -1,6 +1,5 @@
 import * as PIXI from 'pixi.js';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
-import { generateDummyPixels } from './dummyData';
 
 export interface CameraState {
 	x: number;
@@ -17,7 +16,7 @@ export interface PointerState {
 class State {
 	// Global state
 	selectedColor = '#A06A42'; // Brown color that was selected in the original palette
-	pixels = generateDummyPixels(); // Load dummy data for testing
+	pixels = new Map(); // Will be populated by Nostr events
 
 	// PIXI.js objects
 	app!: PIXI.Application;

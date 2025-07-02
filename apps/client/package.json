@@ -9,10 +9,9 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
-		"pixi.js": "^7.3.0",
+		"@nostr-place/nostr-canvas": "workspace:*",
 		"nostr-tools": "^2.0.0",
-		"@getalby/sdk": "^3.0.0",
-		"@nostr-place/nostr-canvas": "workspace:*"
+		"pixi.js": "^7.3.0"
 	},
 	"devDependencies": {
 		"typescript": "^5.0.0",

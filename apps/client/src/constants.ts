@@ -2,7 +2,8 @@
 export const WORLD_SIZE = 2000; // 2000x2000 pixel world
 export const MIN_SCALE = 0.5; // Prevent zooming out too far
 export const MAX_SCALE = 400; // Reasonable maximum zoom
-export const DEFAULT_SCALE = 1;
+export const DEFAULT_SCALE = 25;
+export const OPTIMSTIC_PIXELS_ENABLED = false;
 
 // Color palette constants
 export const COLORS_PER_ROW = 2;

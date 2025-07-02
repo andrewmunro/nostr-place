@@ -72,7 +72,10 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 		const pixelY = Math.floor(worldPos.y);
 
 		if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
-			placePixel(pixelX, pixelY, state.selectedColor);
+			// Handle async pixel placement
+			placePixel(pixelX, pixelY, state.selectedColor).catch(error => {
+				console.error('Error placing pixel:', error);
+			});
 		}
 	} else if (event.button === 2 || event.button === 1) { // Right click or middle click - start panning
 		state.updatePointerState({

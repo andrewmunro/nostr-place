@@ -88,6 +88,7 @@ export function updatePixelTexture() {
 }
 
 export function renderWorld() {
+	updatePixelTexture(); // Update pixel texture if needed
 	renderGrid();
 	renderCursor();
 }

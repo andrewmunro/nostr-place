@@ -20,7 +20,7 @@ export class PixelValidator {
 			return { isValid: false, reason: 'Invalid coordinates' };
 		}
 
-		if (x < 0 || x >= 100 || y < 0 || y >= 100) {
+		if (x < 0 || x >= this.config.canvasSize || y < 0 || y >= this.config.canvasSize) {
 			return { isValid: false, reason: 'Coordinates out of bounds' };
 		}
 
