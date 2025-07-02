@@ -14,13 +14,21 @@
 
 		<div id="ui-overlay">
 			<div id="coordinates-panel">
-				<span id="coordinates">(1000, 1000)</span>
-				<span id="scale">8.00x</span>
+				<span id="coordinates">992,226</span>
+			</div>
+
+			<div id="zoom-controls">
+				<button class="zoom-btn" id="zoom-in">+</button>
+				<button class="zoom-btn" id="zoom-out">−</button>
 			</div>
 		</div>
 
 		<div id="color-palette-container">
-			<div id="color-palette"></div>
+			<div id="palette-scroll-up" class="hidden">↑</div>
+			<div id="color-palette-scroll-container">
+				<div id="color-palette"></div>
+			</div>
+			<div id="palette-scroll-down" class="hidden">↓</div>
 		</div>
 	</div>
 	<script type="module" src="/src/main.ts"></script>

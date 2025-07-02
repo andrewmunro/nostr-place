@@ -1,28 +1,23 @@
 import { Pixel } from '@nostr-place/nostr-canvas';
 import * as PIXI from 'pixi.js';
+import { DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, PRESET_COLORS, WORLD_SIZE } from './constants';
 import { generateDummyPixels } from './dummyData';
 import './style.css';
 
-// Constants
-const WORLD_SIZE = 2000; // 2000x2000 pixel world
-const PIXEL_SIZE = 1; // Each pixel is 1x1 unit in world space
-const MIN_SCALE = 0.5; // Prevent zooming out too far
-const MAX_SCALE = 50; // Reasonable maximum zoom
-const DEFAULT_SCALE = 1;
 
-const PRESET_COLORS = [
-	'#FFFFFF', '#E4E4E4', '#888888', '#222222', '#FFA7D1', '#E50000', '#E59500', '#A06A42',
-	'#E5D900', '#94E044', '#02BE01', '#00D3DD', '#0083C7', '#0000EA', '#CF6EE4', '#820080',
-	'#FFAEB9', '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'
-];
 
 // State
-let selectedColor = '#FF0000';
+let selectedColor = '#A06A42'; // Brown color that was selected in the original palette
 let pixels = generateDummyPixels(); // Load dummy data for testing
 let app: PIXI.Application;
 let viewport: PIXI.Container;
 let pixelContainer: PIXI.Container;
 let gridContainer: PIXI.Container;
+
+// Color palette scroll state
+let paletteScrollOffset = 0;
+const COLORS_PER_ROW = 2;
+const SCROLL_STEP = 2; // Reduced scroll step for smoother navigation
 
 // Texture-based rendering for performance
 let pixelTexture: PIXI.Texture;
@@ -72,6 +67,33 @@ function setupUI() {
 		colorPalette.appendChild(colorButton);
 	});
 
+	// Setup zoom controls
+	const zoomInBtn = document.getElementById('zoom-in')!;
+	const zoomOutBtn = document.getElementById('zoom-out')!;
+
+	zoomInBtn.addEventListener('click', () => {
+		zoomIn();
+	});
+
+	zoomOutBtn.addEventListener('click', () => {
+		zoomOut();
+	});
+
+	// Setup palette scroll controls
+	const scrollUpBtn = document.getElementById('palette-scroll-up')!;
+	const scrollDownBtn = document.getElementById('palette-scroll-down')!;
+
+	scrollUpBtn.addEventListener('click', () => {
+		scrollPalette(-1);
+	});
+
+	scrollDownBtn.addEventListener('click', () => {
+		scrollPalette(1);
+	});
+
+	// Initial palette layout update
+	setTimeout(() => updatePaletteLayout(), 0);
+
 	// Update coordinates display
 	updateCoordinatesDisplay();
 }
@@ -79,7 +101,7 @@ function setupUI() {
 async function setupPixiJS() {
 	app = new PIXI.Application({
 		width: window.innerWidth,
-		height: window.innerHeight - 60, // Account for color palette
+		height: window.innerHeight, // Full window height since UI is overlaid
 		backgroundColor: 0xC0C0C0, // Gray background like pxls.space
 		antialias: false,
 		resolution: window.devicePixelRatio || 1,
@@ -117,6 +139,9 @@ async function setupPixiJS() {
 
 	// Handle resize
 	window.addEventListener('resize', handleResize);
+
+	// Update palette layout on window resize
+	window.addEventListener('resize', updatePaletteLayout);
 }
 
 function setupPixelTexture() {
@@ -335,9 +360,10 @@ function updateCamera() {
 }
 
 function handleResize() {
-	app.renderer.resize(window.innerWidth, window.innerHeight - 60);
+	app.renderer.resize(window.innerWidth, window.innerHeight); // Full window height
 	updateCamera();
 	renderWorld();
+	updatePaletteLayout(); // Update palette layout on resize
 }
 
 function placePixel(x: number, y: number, color: string) {
@@ -422,15 +448,12 @@ function renderCursor() {
 
 function updateCoordinatesDisplay(x?: number, y?: number) {
 	const coordsDisplay = document.getElementById('coordinates')!;
-	const scaleDisplay = document.getElementById('scale')!;
 
 	if (x !== undefined && y !== undefined) {
-		coordsDisplay.textContent = `(${x}, ${y})`;
+		coordsDisplay.textContent = `${x},${y}`;
 	} else {
-		coordsDisplay.textContent = `(${Math.floor(camera.x)}, ${Math.floor(camera.y)})`;
+		coordsDisplay.textContent = `${Math.floor(camera.x)},${Math.floor(camera.y)}`;
 	}
-
-	scaleDisplay.textContent = `${camera.scale.toFixed(2)}x`;
 }
 
 function updateURL() {
@@ -457,6 +480,91 @@ function loadFromURL() {
 	updateCamera();
 	updateCoordinatesDisplay();
 	renderWorld();
+}
+
+function zoomIn() {
+	const zoomFactor = 2;
+	camera.scale = Math.min(MAX_SCALE, camera.scale * zoomFactor);
+	updateCamera();
+	updateURL();
+	updateCoordinatesDisplay();
+	renderWorld();
+}
+
+function zoomOut() {
+	const zoomFactor = 0.5;
+	camera.scale = Math.max(MIN_SCALE, camera.scale * zoomFactor);
+	updateCamera();
+	updateURL();
+	updateCoordinatesDisplay();
+	renderWorld();
+}
+
+function scrollPalette(direction: number) {
+	const totalRows = Math.ceil(PRESET_COLORS.length / COLORS_PER_ROW);
+	const buttonHeight = 28;
+	const scrollButtonHeight = 28;
+	const containerMargin = 20;
+
+	// Calculate available space and max visible rows with scroll buttons
+	const availableHeight = window.innerHeight - containerMargin;
+	const heightWithScrollButtons = availableHeight - (scrollButtonHeight * 2);
+	const maxVisibleRows = Math.floor(heightWithScrollButtons / buttonHeight);
+	const maxScrollOffset = Math.max(0, totalRows - maxVisibleRows);
+
+	// Update scroll offset
+	paletteScrollOffset = Math.max(0, Math.min(maxScrollOffset, paletteScrollOffset + direction * SCROLL_STEP));
+
+	updatePaletteLayout();
+}
+
+function updatePaletteLayout() {
+	const colorPalette = document.getElementById('color-palette')!;
+	const scrollUpBtn = document.getElementById('palette-scroll-up')!;
+	const scrollDownBtn = document.getElementById('palette-scroll-down')!;
+	const container = document.getElementById('color-palette-scroll-container')!;
+
+	// Calculate dimensions
+	const totalRows = Math.ceil(PRESET_COLORS.length / COLORS_PER_ROW);
+	const buttonHeight = 28; // 24px height + 4px gap
+	const scrollButtonHeight = 28; // Height of scroll buttons when visible
+	const containerMargin = 20; // Top and bottom margins
+
+	// Available height for the palette
+	const availableHeight = window.innerHeight - containerMargin;
+	const maxPossibleRows = Math.floor(availableHeight / buttonHeight);
+
+	// Determine if scrolling is needed
+	const needsScrolling = totalRows > maxPossibleRows;
+
+	if (needsScrolling) {
+		// Calculate how many rows can fit with scroll buttons
+		const heightWithScrollButtons = availableHeight - (scrollButtonHeight * 2);
+		const maxVisibleRows = Math.floor(heightWithScrollButtons / buttonHeight);
+		const maxScrollOffset = Math.max(0, totalRows - maxVisibleRows);
+
+		// Show scroll buttons and limit scroll offset
+		scrollUpBtn.classList.toggle('hidden', paletteScrollOffset === 0);
+		scrollDownBtn.classList.toggle('hidden', paletteScrollOffset >= maxScrollOffset);
+
+		// Ensure scroll offset doesn't exceed maximum
+		paletteScrollOffset = Math.min(paletteScrollOffset, maxScrollOffset);
+
+		// Set container height to fit visible rows
+		container.style.height = `${maxVisibleRows * buttonHeight}px`;
+	} else {
+		// Hide scroll buttons and reset scroll
+		scrollUpBtn.classList.add('hidden');
+		scrollDownBtn.classList.add('hidden');
+		paletteScrollOffset = 0;
+
+		// Let container take up space for all colors
+		container.style.height = `${totalRows * buttonHeight}px`;
+	}
+
+	// Apply scroll transform
+	const scrollPixels = paletteScrollOffset * buttonHeight;
+	colorPalette.style.transform = `translateY(-${scrollPixels}px)`;
 }
 
 // Start the application
