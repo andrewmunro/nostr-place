@@ -1,0 +1,40 @@
+export interface NostrEvent {
+	id: string;
+	kind: number;
+	pubkey: string;
+	created_at: number;
+	tags: string[][];
+	content: string;
+	sig: string;
+}
+
+export interface PixelEvent extends NostrEvent {
+	kind: 30001;
+}
+
+export interface ZapEvent extends NostrEvent {
+	kind: 9735;
+}
+
+export interface Pixel {
+	x: number;
+	y: number;
+	color: string;
+	eventId: string;
+	pubkey: string;
+	timestamp: number;
+	zapEventId?: string;
+	zapAmount?: number;
+	isValid?: boolean;
+}
+
+export interface ValidationResult {
+	isValid: boolean;
+	reason?: string;
+}
+
+export interface CanvasConfig {
+	minZapAmount: number; // in millisats
+	zapTimeWindow: number; // in seconds
+	maxPixelAge: number; // in seconds
+} 

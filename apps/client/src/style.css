@@ -1,0 +1,164 @@
+:root {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	line-height: 1.4;
+	font-weight: 400;
+
+	--bg-color: #f0f0f0;
+	--text-color: #333;
+	--panel-bg: rgba(255, 255, 255, 0.9);
+	--panel-border: #ccc;
+	--selected-color: #007acc;
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	background-color: var(--bg-color);
+	color: var(--text-color);
+	font-size: 13px;
+}
+
+#app {
+	position: relative;
+	width: 100vw;
+	height: 100vh;
+}
+
+#canvas-container {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+
+#canvas-container canvas {
+	display: block;
+	cursor: crosshair;
+}
+
+#ui-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 10;
+}
+
+#coordinates-panel {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	background: var(--panel-bg);
+	border: 1px solid var(--panel-border);
+	border-radius: 4px;
+	padding: 8px 12px;
+	font-family: 'Courier New', monospace;
+	font-size: 12px;
+	backdrop-filter: blur(4px);
+	display: flex;
+	gap: 15px;
+}
+
+#coordinates {
+	font-weight: bold;
+}
+
+#scale {
+	color: #666;
+}
+
+#color-palette-container {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+	background: var(--panel-bg);
+	border-top: 1px solid var(--panel-border);
+	padding: 8px;
+	backdrop-filter: blur(4px);
+	z-index: 20;
+}
+
+#color-palette {
+	display: flex;
+	justify-content: center;
+	gap: 2px;
+	flex-wrap: wrap;
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+.color-btn {
+	width: 28px;
+	height: 28px;
+	border: 2px solid #999;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	position: relative;
+}
+
+.color-btn:hover {
+	transform: scale(1.1);
+	z-index: 1;
+}
+
+.color-btn.selected {
+	border-color: #000;
+	border-width: 3px;
+	transform: scale(1.15);
+	box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+	z-index: 2;
+}
+
+/* Special styling for white/light colors */
+.color-btn[style*="rgb(255, 255, 255)"],
+.color-btn[style*="#FFFFFF"],
+.color-btn[style*="#ffffff"],
+.color-btn[style*="#E4E4E4"] {
+	border-color: #666;
+}
+
+.color-btn[style*="rgb(255, 255, 255)"].selected,
+.color-btn[style*="#FFFFFF"].selected,
+.color-btn[style*="#ffffff"].selected,
+.color-btn[style*="#E4E4E4"].selected {
+	border-color: #333;
+}
+
+/* Scrollbar styling for webkit browsers */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #888;
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #555;
+}
+
+/* Disable text selection on UI elements */
+#ui-overlay,
+#color-palette-container {
+	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+}
