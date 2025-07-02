@@ -1,7 +1,12 @@
+// World constants
 export const WORLD_SIZE = 2000; // 2000x2000 pixel world
 export const MIN_SCALE = 0.5; // Prevent zooming out too far
 export const MAX_SCALE = 400; // Reasonable maximum zoom
 export const DEFAULT_SCALE = 1;
+
+// Color palette constants
+export const COLORS_PER_ROW = 2;
+export const SCROLL_STEP = 2; // Reduced scroll step for smoother navigation
 
 export const PRESET_COLORS = [
 	'#FFFFFF', '#C4C4C4', '#A6A6A6', '#888888', '#6F6F6F', '#555555', '#3A3A3A', '#222222',
