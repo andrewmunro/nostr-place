@@ -33,6 +33,11 @@ export class NostrClient {
 	private reconnectTimers: Map<string, NodeJS.Timeout>;
 	private privateKey?: string;
 	private publicKey?: string;
+	private paginationState: {
+		oldestTimestamp?: number;
+		isComplete: boolean;
+		pagesFetched: number;
+	};
 
 	constructor(config: NostrClientConfig, callbacks: CanvasEventCallbacks = {}) {
 		this.config = config;
@@ -157,26 +162,73 @@ export class NostrClient {
 			throw new Error('No connected relays');
 		}
 
-		// Subscribe to pixel placement events (kind 30001)
-		this.subscribeToEvents({
-			kinds: [90001],
-		});
+		// Reset pagination state
+		this.paginationState = {
+			isComplete: false,
+			pagesFetched: 0
+		};
 
-		// // Subscribe to zap events (kind 9735)
-		// this.subscribeToEvents({
-		// 	kinds: [9735],
-		// });
+		// Start the pagination chain
+		this.scheduleFetchNextPage(this.config.pagination);
 	}
 
-	private subscribeToEvents(filter: Filter): void {
-		this.pool.subscribe(this.state.connectedRelays, filter, {
-			onevent: (event: NostrEvent) => {
-				this.handleEvent(event);
-			},
-			oneose: () => {
-				// End of stored events - could log if needed
+	private async fetchNextPage(paginationConfig: NostrClientConfig['pagination']): Promise<void> {
+		return new Promise((resolve) => {
+			const filter: Filter = {
+				kinds: [90001],
+				limit: paginationConfig.eventsPerPage
+			};
+
+			// Add until filter if we have an oldest timestamp from previous page
+			if (this.paginationState.oldestTimestamp) {
+				filter.until = this.paginationState.oldestTimestamp;
 			}
+
+			let pageEvents = 0;
+			let oldestInThisPage: number | undefined;
+
+			this.pool.subscribe(this.state.connectedRelays, filter, {
+				onevent: (event: NostrEvent) => {
+					pageEvents++;
+					this.handleEvent(event);
+
+					// Track the oldest timestamp in this page
+					if (!oldestInThisPage || event.created_at < oldestInThisPage) {
+						oldestInThisPage = event.created_at;
+					}
+				},
+				oneose: () => {
+					// Update pagination state with the oldest timestamp from this page
+					if (oldestInThisPage) {
+						this.paginationState.oldestTimestamp = oldestInThisPage;
+					}
+
+					this.paginationState.pagesFetched++;
+
+					// Mark pagination as complete if we got no events or reached max pages
+					if (pageEvents === 0 || this.paginationState.pagesFetched >= paginationConfig.maxPages) {
+						this.paginationState.isComplete = true;
+					}
+
+					resolve();
+				}
+			});
 		});
+	}
+
+	private scheduleFetchNextPage(paginationConfig: NostrClientConfig['pagination']): void {
+		if (this.paginationState.isComplete) {
+			return;
+		}
+
+		setTimeout(async () => {
+			await this.fetchNextPage(paginationConfig);
+
+			// Schedule next page if not complete
+			if (!this.paginationState.isComplete) {
+				this.scheduleFetchNextPage(paginationConfig);
+			}
+		}, paginationConfig.requestDelay);
 	}
 
 	// Event handling
@@ -334,7 +386,12 @@ export function createDefaultConfig(): NostrClientConfig {
 			maxPixelAge: 86400, // 24 hours
 			canvasSize: 2000
 		},
-		reconnectInterval: 5000, // 5 seconds
-		maxReconnectAttempts: 5
+		reconnectInterval: 5000,
+		maxReconnectAttempts: 5,
+		pagination: {
+			maxPages: 10,
+			eventsPerPage: 500,
+			requestDelay: 0
+		}
 	};
 } 

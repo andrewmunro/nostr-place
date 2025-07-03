@@ -53,6 +53,11 @@ export interface NostrClientConfig {
 	canvasConfig: CanvasConfig;
 	reconnectInterval: number; // milliseconds
 	maxReconnectAttempts: number;
+	pagination: {
+		maxPages: number;
+		eventsPerPage: number;
+		requestDelay: number; // milliseconds between paginated requests
+	};
 }
 
 // Event callback types
