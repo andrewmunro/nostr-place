@@ -38,6 +38,7 @@ export class NostrClient {
 		isComplete: boolean;
 		pagesFetched: number;
 	};
+	private isRealTimeSubscriptionActive: boolean = false;
 
 	constructor(config: NostrClientConfig, callbacks: CanvasEventCallbacks = {}) {
 		this.config = config;
@@ -105,13 +106,26 @@ export class NostrClient {
 			this.callbacks.onRelayStatus?.(relay);
 
 			// Test connection by attempting to connect
-			await this.pool.ensureRelay(url);
+			const connection = await this.pool.ensureRelay(url);
+			connection.onclose = () => {
+				console.log('Relay closed');
+				this.scheduleReconnect(url);
+			}
+			connection.onnotice = (notice: string) => {
+				console.log('Relay notice:', notice);
+			}
 
 			relay.status = 'connected';
 			relay.lastConnected = Date.now();
 			relay.errorCount = 0;
 
 			this.callbacks.onRelayStatus?.(relay);
+			this.updateConnectionState();
+
+			// Re-establish real-time subscription if it was active
+			if (this.isRealTimeSubscriptionActive) {
+				this.subscribeToRealTimeEvents();
+			}
 		} catch (error) {
 			relay.status = 'error';
 			relay.errorCount++;
@@ -156,20 +170,41 @@ export class NostrClient {
 		this.state.isConnected = connected.length > 0;
 	}
 
-	// Event subscription
-	async subscribeToCanvas(): Promise<void> {
+	async fetchHistoricalEvents(): Promise<void> {
 		if (this.state.connectedRelays.length === 0) {
 			throw new Error('No connected relays');
 		}
 
-		// Reset pagination state
 		this.paginationState = {
 			isComplete: false,
+			oldestTimestamp: Math.floor(Date.now() / 1000),
 			pagesFetched: 0
 		};
 
-		// Start the pagination chain
-		this.scheduleFetchNextPage(this.config.pagination);
+		await this.scheduleFetchNextPage(this.config.pagination);
+	}
+
+	// Event subscription
+	async subscribeToCanvas(): Promise<void> {
+		this.isRealTimeSubscriptionActive = true;
+		this.subscribeToRealTimeEvents();
+	}
+
+	private subscribeToRealTimeEvents(): void {
+		const filter: Filter = {
+			kinds: [90001],
+			since: Math.floor(Date.now() / 1000)
+		};
+
+		this.pool.subscribe(this.state.connectedRelays, filter, {
+			onevent: (event: NostrEvent) => {
+				this.handleEvent(event);
+			},
+			onclose: () => {
+				console.log('Real-time subscription ended, restarting...');
+				this.subscribeToRealTimeEvents();
+			},
+		});
 	}
 
 	private async fetchNextPage(paginationConfig: NostrClientConfig['pagination']): Promise<void> {
@@ -189,6 +224,11 @@ export class NostrClient {
 
 			this.pool.subscribe(this.state.connectedRelays, filter, {
 				onevent: (event: NostrEvent) => {
+					// Skip events that are older than or equal to our "since" timestamp
+					if (event.created_at <= paginationConfig.since) {
+						return;
+					}
+
 					pageEvents++;
 					this.handleEvent(event);
 
@@ -198,6 +238,9 @@ export class NostrClient {
 					}
 				},
 				oneose: () => {
+					// Store the previous oldest timestamp to detect if we're making progress
+					const previousOldest = this.paginationState.oldestTimestamp;
+
 					// Update pagination state with the oldest timestamp from this page
 					if (oldestInThisPage) {
 						this.paginationState.oldestTimestamp = oldestInThisPage;
@@ -205,8 +248,13 @@ export class NostrClient {
 
 					this.paginationState.pagesFetched++;
 
-					// Mark pagination as complete if we got no events or reached max pages
-					if (pageEvents === 0 || this.paginationState.pagesFetched >= paginationConfig.maxPages) {
+					// Mark pagination as complete if:
+					// 1. We got no events
+					// 2. We've reached or passed the "since" timestamp
+					// 3. We're not making progress (same oldest timestamp as before)
+					if (pageEvents === 0 ||
+						(this.paginationState.oldestTimestamp && this.paginationState.oldestTimestamp <= paginationConfig.since) ||
+						(previousOldest && this.paginationState.oldestTimestamp === previousOldest)) {
 						this.paginationState.isComplete = true;
 					}
 
@@ -216,7 +264,7 @@ export class NostrClient {
 		});
 	}
 
-	private scheduleFetchNextPage(paginationConfig: NostrClientConfig['pagination']): void {
+	private async scheduleFetchNextPage(paginationConfig: NostrClientConfig['pagination']): Promise<void> {
 		if (this.paginationState.isComplete) {
 			return;
 		}
@@ -354,6 +402,9 @@ export class NostrClient {
 
 	// Cleanup
 	async disconnect(): Promise<void> {
+		// Mark real-time subscription as inactive
+		this.isRealTimeSubscriptionActive = false;
+
 		// Clear reconnect timers
 		this.reconnectTimers.forEach(timer => clearTimeout(timer));
 		this.reconnectTimers.clear();
@@ -367,6 +418,11 @@ export class NostrClient {
 		this.relays.forEach(relay => {
 			relay.status = 'disconnected';
 		});
+	}
+
+	// Stop real-time subscription
+	stopRealTimeSubscription(): void {
+		this.isRealTimeSubscriptionActive = false;
 	}
 }
 
@@ -389,9 +445,9 @@ export function createDefaultConfig(): NostrClientConfig {
 		reconnectInterval: 5000,
 		maxReconnectAttempts: 5,
 		pagination: {
-			maxPages: 10,
 			eventsPerPage: 500,
-			requestDelay: 0
+			requestDelay: 0,
+			since: 1751410800
 		}
 	};
 } 

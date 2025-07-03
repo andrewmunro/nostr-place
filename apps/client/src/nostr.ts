@@ -66,6 +66,8 @@ class NostrService {
 			console.log('Connecting to Nostr relays...');
 			await this.client.connect();
 
+			await this.client.fetchHistoricalEvents();
+
 			// Subscribe to canvas events
 			console.log('Subscribing to canvas events...');
 			await this.client.subscribeToCanvas();

@@ -54,9 +54,9 @@ export interface NostrClientConfig {
 	reconnectInterval: number; // milliseconds
 	maxReconnectAttempts: number;
 	pagination: {
-		maxPages: number;
 		eventsPerPage: number;
 		requestDelay: number; // milliseconds between paginated requests
+		since: number; // epoch timestamp - only fetch events since this time
 	};
 }
 
