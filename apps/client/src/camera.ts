@@ -3,6 +3,102 @@ import { updateURL } from './persistence';
 import { renderWorld } from './renderer';
 import { state } from './state';
 
+// Animation state for smooth zoom
+let isAnimating = false;
+let animationId: number | null = null;
+let startScale = 1;
+let targetScale = 1;
+let animationProgress = 0;
+const ANIMATION_DURATION = 200; // milliseconds
+
+function lerp(start: number, end: number, t: number): number {
+	return start + (end - start) * t;
+}
+
+function easeOutQuad(t: number): number {
+	return 1 - (1 - t) * (1 - t);
+}
+
+function animateZoom(timestamp: number) {
+	if (!isAnimating) return;
+
+	animationProgress = Math.min(1, animationProgress + (16 / ANIMATION_DURATION)); // Assume 60fps
+	const easedProgress = easeOutQuad(animationProgress);
+	const currentScale = lerp(startScale, targetScale, easedProgress);
+
+	state.updateCamera({ scale: currentScale });
+	updateCamera();
+	updateCoordinatesDisplay();
+	renderWorld();
+
+	if (animationProgress >= 1) {
+		isAnimating = false;
+		animationId = null;
+		updateURL(); // Only update URL once at the end
+	} else {
+		animationId = requestAnimationFrame(animateZoom);
+	}
+}
+
+function startZoomAnimation(newTargetScale: number) {
+	if (isAnimating && animationId) {
+		cancelAnimationFrame(animationId);
+	}
+
+	startScale = state.camera.scale;
+	targetScale = newTargetScale;
+	animationProgress = 0;
+	isAnimating = true;
+	animationId = requestAnimationFrame(animateZoom);
+}
+
+export function smoothZoomToPoint(targetScale: number, screenX: number, screenY: number) {
+	if (isAnimating && animationId) {
+		cancelAnimationFrame(animationId);
+	}
+
+	const worldPosBeforeZoom = screenToWorld(screenX, screenY);
+
+	startScale = state.camera.scale;
+	targetScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, targetScale));
+	animationProgress = 0;
+	isAnimating = true;
+
+	// Store the zoom point for the animation
+	const zoomPoint = { screenX, screenY, worldPos: worldPosBeforeZoom };
+
+	function animateZoomToPoint() {
+		if (!isAnimating) return;
+
+		animationProgress = Math.min(1, animationProgress + (16 / ANIMATION_DURATION));
+		const easedProgress = easeOutQuad(animationProgress);
+		const currentScale = lerp(startScale, targetScale, easedProgress);
+
+		state.updateCamera({ scale: currentScale });
+
+		// Adjust camera position to keep the same world position under the zoom point
+		const worldPosAfterZoom = screenToWorld(zoomPoint.screenX, zoomPoint.screenY);
+		state.updateCamera({
+			x: state.camera.x + zoomPoint.worldPos.x - worldPosAfterZoom.x,
+			y: state.camera.y + zoomPoint.worldPos.y - worldPosAfterZoom.y
+		});
+
+		updateCamera();
+		updateCoordinatesDisplay();
+		renderWorld();
+
+		if (animationProgress >= 1) {
+			isAnimating = false;
+			animationId = null;
+			updateURL(); // Only update URL once at the end
+		} else {
+			animationId = requestAnimationFrame(animateZoomToPoint);
+		}
+	}
+
+	animationId = requestAnimationFrame(animateZoomToPoint);
+}
+
 export function clampCamera() {
 	// Clamp camera position to world bounds
 	state.camera.x = Math.max(0, Math.min(WORLD_SIZE, state.camera.x));
@@ -60,19 +156,13 @@ export function updateCoordinatesDisplay(x?: number, y?: number) {
 }
 
 export function zoomIn() {
-	const zoomFactor = 2;
-	state.updateCamera({ scale: Math.min(MAX_SCALE, state.camera.scale * zoomFactor) });
-	updateCamera();
-	updateURL();
-	updateCoordinatesDisplay();
-	renderWorld();
+	const zoomFactor = 1.4;
+	const newScale = Math.min(MAX_SCALE, state.camera.scale * zoomFactor);
+	startZoomAnimation(newScale);
 }
 
 export function zoomOut() {
-	const zoomFactor = 0.5;
-	state.updateCamera({ scale: Math.max(MIN_SCALE, state.camera.scale * zoomFactor) });
-	updateCamera();
-	updateURL();
-	updateCoordinatesDisplay();
-	renderWorld();
+	const zoomFactor = 1 / 1.4;
+	const newScale = Math.max(MIN_SCALE, state.camera.scale * zoomFactor);
+	startZoomAnimation(newScale);
 } 

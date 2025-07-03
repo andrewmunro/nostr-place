@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { getCenterPixel, screenToWorld, updateCamera as updateCameraView, updateCoordinatesDisplay } from './camera';
+import { getCenterPixel, screenToWorld, smoothZoomToPoint, updateCamera as updateCameraView, updateCoordinatesDisplay } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
 import { loadFromURL, updateURL } from './persistence';
 import { placePixel } from './pixels';
@@ -360,23 +360,10 @@ function handleWheel(event: PIXI.FederatedWheelEvent) {
 	event.preventDefault();
 
 	const pointer = event.global;
-	const worldPosBeforeZoom = screenToWorld(pointer.x, pointer.y);
+	const zoomFactor = event.deltaY > 0 ? 1 / 1.2 : 1.2;
+	const newScale = state.camera.scale * zoomFactor;
 
-	const zoomFactor = event.deltaY > 0 ? 0.2 : 5;
-	state.updateCamera({ scale: Math.max(MIN_SCALE, Math.min(MAX_SCALE, state.camera.scale * zoomFactor)) });
-
-	const worldPosAfterZoom = screenToWorld(pointer.x, pointer.y);
-
-	// Adjust camera position to keep the same world position under the mouse
-	state.updateCamera({
-		x: state.camera.x + worldPosBeforeZoom.x - worldPosAfterZoom.x,
-		y: state.camera.y + worldPosBeforeZoom.y - worldPosAfterZoom.y
-	});
-
-	updateCameraView();
-	updateURL();
-	updateCoordinatesDisplay();
-	renderWorld();
+	smoothZoomToPoint(newScale, pointer.x, pointer.y);
 }
 
 function handleResize() {

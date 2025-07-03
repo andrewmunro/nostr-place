@@ -3,12 +3,29 @@ import { MAX_SCALE, MIN_SCALE } from './constants';
 import { renderWorld } from './renderer';
 import { state } from './state';
 
-export function updateURL() {
+function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
+	let timeoutId: number | null = null;
+
+	return ((...args: Parameters<T>) => {
+		if (timeoutId !== null) {
+			clearTimeout(timeoutId);
+		}
+
+		timeoutId = window.setTimeout(() => {
+			func(...args);
+			timeoutId = null;
+		}, delay);
+	}) as T;
+}
+
+function updateURLImmediate() {
 	const hash = `#x=${Math.floor(state.camera.x)}&y=${Math.floor(state.camera.y)}&scale=${state.camera.scale.toFixed(2)}`;
 	if (window.location.hash !== hash) {
 		window.history.replaceState(null, '', hash);
 	}
 }
+
+export const updateURL = debounce(updateURLImmediate, 50);
 
 export function loadFromURL() {
 	const hash = window.location.hash.slice(1);
