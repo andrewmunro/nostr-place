@@ -1,8 +1,8 @@
 import * as PIXI from 'pixi.js';
 import { getCenterPixel, screenToWorld, smoothZoomToPoint, updateCamera as updateCameraView, updateCoordinatesDisplay } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
+import { nostrService } from './nostr';
 import { loadFromURL, updateURL } from './persistence';
-import { placePixel } from './pixels';
 import { renderCursor, renderWorld } from './renderer';
 import { state } from './state';
 import { updatePaletteLayout } from './ui';
@@ -50,11 +50,6 @@ function calculateCenter(p1: { x: number; y: number }, p2: { x: number; y: numbe
 		x: (p1.x + p2.x) / 2,
 		y: (p1.y + p2.y) / 2
 	};
-}
-
-// Helper function to check if we should start pinch gesture
-function shouldStartPinch(): boolean {
-	return state.touchState.activeTouches.size === 2 && !state.touchState.isPinching;
 }
 
 // Helper function to handle pinch gesture
@@ -150,7 +145,7 @@ function startTouchHold(globalPos: { x: number; y: number }) {
 			// Place pixel at center position
 			const centerPixel = getCenterPixel();
 			if (centerPixel.x >= 0 && centerPixel.x < WORLD_SIZE && centerPixel.y >= 0 && centerPixel.y < WORLD_SIZE) {
-				placePixel(centerPixel.x, centerPixel.y, state.selectedColor).catch(error => {
+				nostrService.publishPixel(centerPixel.x, centerPixel.y, state.selectedColor).catch(error => {
 					console.error('Error placing pixel:', error);
 				});
 			}
@@ -214,7 +209,7 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 			const pixelY = state.pointerState.mouseCursorPixel.y;
 
 			if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
-				placePixel(pixelX, pixelY, state.selectedColor).catch(error => {
+				nostrService.publishPixel(pixelX, pixelY, state.selectedColor).catch(error => {
 					console.error('Error placing pixel:', error);
 				});
 			}

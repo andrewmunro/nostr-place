@@ -1,5 +1,8 @@
+import { Pixel } from '@nostr-place/nostr-canvas';
 import * as PIXI from 'pixi.js';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
+import { nostrService } from './nostr';
+import { updateActionButtons } from './ui';
 
 export interface CameraState {
 	x: number;
@@ -27,10 +30,22 @@ export interface TouchState {
 	hasTouchBeenUsed: boolean;
 }
 
+export interface PixelAction {
+	x: number;
+	y: number;
+	color: string | null;
+	previousColor: string | null;
+	timestamp: number;
+}
+
 class State {
 	// Global state
-	selectedColor = '#A06A42'; // Brown color that was selected in the original palette
+	selectedColor: string | null = '#A06A42'; // Brown color that was selected in the original palette
 	pixels = new Map(); // Will be populated by Nostr events
+
+	// Undo history
+	undoHistory: PixelAction[] = [];
+	maxUndoHistory = 50;
 
 	// PIXI.js objects
 	app!: PIXI.Application;
@@ -85,6 +100,30 @@ class State {
 
 	updateTouchState(updates: Partial<TouchState>) {
 		this.touchState = { ...this.touchState, ...updates };
+	}
+
+	addToUndoHistory(action: Pixel) {
+		this.undoHistory.push({
+			x: action.x,
+			y: action.y,
+			color: action.color,
+			timestamp: action.timestamp,
+			previousColor: this.pixels.get(`${action.x},${action.y}`)?.color || null
+		});
+
+		if (this.undoHistory.length > this.maxUndoHistory) {
+			this.undoHistory.shift();
+		}
+
+		updateActionButtons();
+	}
+
+	undoLastAction() {
+		const lastAction = this.undoHistory.pop() || null;
+		if (!lastAction) return;
+
+		nostrService.publishPixel(lastAction.x, lastAction.y, lastAction.previousColor, true);
+		updateActionButtons();
 	}
 }
 

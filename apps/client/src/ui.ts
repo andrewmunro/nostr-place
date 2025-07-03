@@ -6,6 +6,7 @@ export function setupUI() {
 	setupColorPalette();
 	setupZoomControls();
 	setupPaletteScrollControls();
+	setupActionControls();
 
 	// Initial palette layout update
 	setTimeout(() => updatePaletteLayout(), 0);
@@ -18,10 +19,13 @@ function setupColorPalette() {
 	const colorPalette = document.getElementById('color-palette')!;
 	colorPalette.innerHTML = '';
 
+	// Add regular colors
 	PRESET_COLORS.forEach(color => {
 		const colorButton = document.createElement('div');
-		colorButton.className = 'color-btn';
-		colorButton.style.backgroundColor = color;
+		colorButton.className = color ? 'color-btn' : 'color-btn clear-color';
+		colorButton.style.backgroundColor = color ? color : '#FFFFFF';
+		colorButton.title = color ? color : 'Clear/Delete Pixel';
+		colorButton.textContent = color ? null : '✕';
 		if (color === state.selectedColor) {
 			colorButton.classList.add('selected');
 		}
@@ -60,7 +64,18 @@ function setupPaletteScrollControls() {
 	});
 }
 
-export function selectColor(color: string) {
+function setupActionControls() {
+	const undoBtn = document.getElementById('undo-btn')!;
+
+	undoBtn.addEventListener('click', () => {
+		state.undoLastAction();
+	});
+
+	// Initial state
+	updateActionButtons();
+}
+
+export function selectColor(color: string | null) {
 	state.selectedColor = color;
 
 	// Update UI
@@ -138,4 +153,17 @@ export function updatePaletteLayout() {
 	// Apply scroll transform
 	const scrollPixels = state.paletteScrollOffset * buttonHeight;
 	colorPalette.style.transform = `translateY(-${scrollPixels}px)`;
+}
+
+export function updateActionButtons() {
+	const undoBtn = document.getElementById('undo-btn')! as HTMLButtonElement;
+
+	// Update undo button state
+	if (state.undoHistory.length > 0) {
+		undoBtn.disabled = false;
+		undoBtn.title = `Undo (${state.undoHistory.length} actions)`;
+	} else {
+		undoBtn.disabled = true;
+		undoBtn.title = 'No actions to undo';
+	}
 } 

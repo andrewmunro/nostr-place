@@ -157,7 +157,7 @@ export function renderCursor() {
 			cursorPixelY >= 0 && cursorPixelY < WORLD_SIZE) {
 			const cursorGraphics = new PIXI.Graphics();
 			cursorGraphics.lineStyle(2 / state.camera.scale, 0x000000, 0.8);
-			cursorGraphics.beginFill(parseInt(state.selectedColor.replace('#', ''), 16), 1);
+			cursorGraphics.beginFill(state.selectedColor ? parseInt(state.selectedColor.replace('#', ''), 16) : 0xC0C0C0, 1);
 			cursorGraphics.drawRect(cursorPixelX, cursorPixelY, 1, 1);
 			cursorGraphics.endFill();
 			state.pixelContainer.addChild(cursorGraphics);

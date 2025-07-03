@@ -10,6 +10,7 @@ export const COLORS_PER_ROW = 2;
 export const SCROLL_STEP = 2; // Reduced scroll step for smoother navigation
 
 export const PRESET_COLORS = [
+	null,
 	'#FFFFFF', '#C4C4C4', '#A6A6A6', '#888888', '#6F6F6F', '#555555', '#3A3A3A', '#222222',
 	'#000000', '#003638', '#006600', '#477050', '#1B7400', '#22B14C', '#02BE01', '#51E119',
 	'#94E044', '#34EB6B', '#98FB98', '#75CEA9', '#CAFF70', '#FBFF5B', '#E5D900', '#FFCC00',
@@ -17,5 +18,6 @@ export const PRESET_COLORS = [
 	'#9F0000', '#4D082C', '#6B0000', '#440414', '#FF755F', '#A06A42', '#633C1F', '#99530D',
 	'#BB4F00', '#FFC49F', '#FFDFCC', '#FF7EBB', '#FFA7D1', '#EC08EC', '#BB276C', '#CF6EE4',
 	'#7D26CD', '#820080', '#591C91', '#330077', '#020763', '#5100FF', '#0000EA', '#044BFF',
-	'#013182', '#005BA1', '#6583CF', '#36BAFF', '#0083C7', '#00D3DD', '#45FFC8', '#B5E8EE'
+	'#013182', '#005BA1', '#6583CF', '#36BAFF', '#0083C7', '#00D3DD', '#45FFC8', '#B5E8EE',
+	'#B8E9D9'
 ];

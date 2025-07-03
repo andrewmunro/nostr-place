@@ -80,7 +80,7 @@ export class PixelValidator {
 
 		const x = parseInt(xTag?.[1] || '0');
 		const y = parseInt(yTag?.[1] || '0');
-		const color = colorTag?.[1] || '#000000';
+		const color = colorTag?.[1];
 
 		let zapAmount: number | undefined;
 		if (zapEvent) {

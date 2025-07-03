@@ -19,6 +19,11 @@ function updateUserInfo(publicKey?: string) {
 	}
 }
 
+function isDebugMode(): boolean {
+	const urlParams = new URLSearchParams(window.location.search);
+	return urlParams.has('debug');
+}
+
 class NostrService {
 	private client: NostrClient;
 	private isInitialized = false;
@@ -82,27 +87,28 @@ class NostrService {
 		}
 	}
 
-	private handlePixelUpdate(pixel: Pixel): void {
+	public handlePixelUpdate(pixel: Pixel): void {
 		// Update local state
 		const pixelKey = `${pixel.x},${pixel.y}`;
 		state.pixels.set(pixelKey, pixel);
 
-		// Render all pixels immediately (optimistic updates for UX)
-		// Invalid pixels will be shown in a dimmed state until validated
-		const displayColor = pixel.color;//pixel.isValid ? pixel.color : this.dimColor(pixel.color);
-
 		// Update canvas texture
-		state.pixelContext.fillStyle = displayColor;
-		state.pixelContext.fillRect(pixel.x, pixel.y, 1, 1);
+		if (pixel.color) {
+			state.pixelContext.fillStyle = pixel.color;
+			state.pixelContext.fillRect(pixel.x, pixel.y, 1, 1);
+		} else {
+			state.pixelContext.clearRect(pixel.x, pixel.y, 1, 1);
+		}
+
 		state.pixelTexture.update();
 
 		renderCursor();
-
-		const status = pixel.isValid ? 'valid' : 'pending validation';
-		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${pixel.color} (${status})`);
+		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}`);
 	}
 
-	private dimColor(color: string): string {
+	private dimColor(color: string | null): string | null {
+		if (!color) return null;
+
 		// Convert hex color to dimmed version for pending pixels
 		if (color.startsWith('#')) {
 			const r = parseInt(color.slice(1, 3), 16);
@@ -119,30 +125,41 @@ class NostrService {
 		return color; // fallback for non-hex colors
 	}
 
-	async publishPixel(x: number, y: number, color: string): Promise<void> {
+	async publishPixel(x: number, y: number, color: string | null, isUndo: boolean = false): Promise<void> {
 		if (!this.isInitialized) {
 			throw new Error('Nostr service not initialized');
 		}
 
+		const pixel: Pixel = {
+			x,
+			y,
+			color,
+			eventId: `${x}_${y}_${Date.now()}`, // Temporary ID until real event comes back
+			pubkey: this.client.getPublicKey() || 'unknown',
+			timestamp: Date.now(),
+		};
+
+		if (!isUndo) {
+			state.addToUndoHistory(pixel);
+		}
+
+		if (isDebugMode()) {
+			this.handlePixelUpdate(pixel);
+			return;
+		}
+
+		// Optimistically update local state immediately
+		if (OPTIMSTIC_PIXELS_ENABLED) {
+			// Update local state immediately for instant feedback
+			this.handlePixelUpdate({
+				...pixel,
+				color: this.dimColor(color)
+			});
+		}
+
 		try {
-			// Optimistically update local state immediately
-			if (OPTIMSTIC_PIXELS_ENABLED) {
-				const optimisticPixel: Pixel = {
-					x,
-					y,
-					color,
-					eventId: `temp_${x}_${y}_${Date.now()}`, // Temporary ID until real event comes back
-					pubkey: this.client.getPublicKey() || 'unknown',
-					timestamp: Date.now(),
-					isValid: false // Will be true when zap comes through
-				};
-
-				// Update local state immediately for instant feedback
-				this.handlePixelUpdate(optimisticPixel);
-			}
-
 			// Publish to Nostr in the background
-			const eventId = await this.client.publishPixelEvent(x, y, color);
+			const eventId = await this.client.publishPixelEvent(pixel);
 			console.log(`Published pixel event: ${eventId}`);
 		} catch (error) {
 			console.error('Failed to publish pixel:', error);

@@ -359,7 +359,7 @@ export class NostrClient {
 	}
 
 	// Event publishing
-	async publishPixelEvent(x: number, y: number, color: string): Promise<string> {
+	async publishPixelEvent(pixel: Pixel): Promise<string> {
 		if (!this.privateKey) {
 			throw new Error('No private key set. Call generateKeys() or setKeys() first.');
 		}
@@ -372,13 +372,15 @@ export class NostrClient {
 			kind: 90001,
 			created_at: Math.floor(Date.now() / 1000),
 			tags: [
-				['x', x.toString()],
-				['y', y.toString()],
-				['color', color],
-				['zap_required', 'true']
+				['x', pixel.x.toString()],
+				['y', pixel.y.toString()],
 			],
-			content: `Placing ${color} pixel at (${x}, ${y})`
+			content: `https://zappy-place.pages.dev/#x=${pixel.x}&y=${pixel.y}&scale=25.00`
 		};
+
+		if (pixel.color) {
+			event.tags.push(['color', pixel.color]);
+		}
 
 		const privateKeyBytes = hexToBytes(this.privateKey);
 		const signedEvent = finalizeEvent(event, privateKeyBytes);
