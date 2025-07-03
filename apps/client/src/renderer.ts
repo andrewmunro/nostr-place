@@ -135,13 +135,32 @@ export function renderCursor() {
 		}
 	});
 
-	// Render cursor preview
-	if (state.pointerState.cursorPixel && state.camera.scale >= 2) { // Only show cursor when zoomed in enough
-		const cursorGraphics = new PIXI.Graphics();
-		cursorGraphics.lineStyle(2 / state.camera.scale, 0x000000, 0.8);
-		cursorGraphics.beginFill(parseInt(state.selectedColor.replace('#', ''), 16), 1);
-		cursorGraphics.drawRect(state.pointerState.cursorPixel.x, state.pointerState.cursorPixel.y, 1, 1);
-		cursorGraphics.endFill();
-		state.pixelContainer.addChild(cursorGraphics);
+	// Only show cursor when zoomed in enough
+	if (state.camera.scale >= 2) {
+		let cursorPixelX: number | null = null;
+		let cursorPixelY: number | null = null;
+
+		// Show cursor at mouse position if mouse cursor is being tracked
+		if (state.pointerState.mouseCursorPixel) {
+			cursorPixelX = state.pointerState.mouseCursorPixel.x;
+			cursorPixelY = state.pointerState.mouseCursorPixel.y;
+		} else if (state.touchState.activeTouches.size > 0 || state.touchState.holdTimer !== null || state.touchState.hasTouchBeenUsed) {
+			// Show cursor at center for touch controls (when touches are active, during hold, or if touch has been used)
+			cursorPixelX = Math.floor(state.camera.x);
+			cursorPixelY = Math.floor(state.camera.y);
+		}
+		// If no mouse cursor and no touch interaction, don't show cursor at all
+
+		// Only show cursor if we have valid coordinates and pixel is within world bounds
+		if (cursorPixelX !== null && cursorPixelY !== null &&
+			cursorPixelX >= 0 && cursorPixelX < WORLD_SIZE &&
+			cursorPixelY >= 0 && cursorPixelY < WORLD_SIZE) {
+			const cursorGraphics = new PIXI.Graphics();
+			cursorGraphics.lineStyle(2 / state.camera.scale, 0x000000, 0.8);
+			cursorGraphics.beginFill(parseInt(state.selectedColor.replace('#', ''), 16), 1);
+			cursorGraphics.drawRect(cursorPixelX, cursorPixelY, 1, 1);
+			cursorGraphics.endFill();
+			state.pixelContainer.addChild(cursorGraphics);
+		}
 	}
 } 

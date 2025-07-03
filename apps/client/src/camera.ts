@@ -40,13 +40,22 @@ export function worldToScreen(worldX: number, worldY: number) {
 	};
 }
 
+export function getCenterPixel() {
+	return {
+		x: Math.floor(state.camera.x),
+		y: Math.floor(state.camera.y)
+	};
+}
+
 export function updateCoordinatesDisplay(x?: number, y?: number) {
 	const coordsDisplay = document.getElementById('coordinates')!;
 
 	if (x !== undefined && y !== undefined) {
 		coordsDisplay.textContent = `${x},${y}`;
 	} else {
-		coordsDisplay.textContent = `${Math.floor(state.camera.x)},${Math.floor(state.camera.y)}`;
+		// Always show center pixel coordinates
+		const centerPixel = getCenterPixel();
+		coordsDisplay.textContent = `${centerPixel.x},${centerPixel.y}`;
 	}
 }
 

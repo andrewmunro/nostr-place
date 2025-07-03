@@ -10,7 +10,21 @@ export interface CameraState {
 export interface PointerState {
 	isDragging: boolean;
 	lastPos: { x: number; y: number };
-	cursorPixel: { x: number; y: number } | null;
+	// Mouse-specific cursor tracking
+	mouseCursorPixel: { x: number; y: number } | null;
+}
+
+export interface TouchState {
+	holdTimer: NodeJS.Timeout | null;
+	touchStartPos: { x: number; y: number } | null;
+	// Pinch gesture tracking
+	isPinching: boolean;
+	pinchStartDistance: number;
+	pinchStartScale: number;
+	pinchCenter: { x: number; y: number } | null;
+	activeTouches: Map<number, { x: number; y: number }>;
+	// Track if touch controls have been used
+	hasTouchBeenUsed: boolean;
 }
 
 class State {
@@ -45,7 +59,19 @@ class State {
 	pointerState: PointerState = {
 		isDragging: false,
 		lastPos: { x: 0, y: 0 },
-		cursorPixel: null
+		mouseCursorPixel: null
+	};
+
+	// Touch interaction state
+	touchState: TouchState = {
+		holdTimer: null,
+		touchStartPos: null,
+		isPinching: false,
+		pinchStartDistance: 0,
+		pinchStartScale: 1,
+		pinchCenter: null,
+		activeTouches: new Map(),
+		hasTouchBeenUsed: false
 	};
 
 	// Helper methods for complex updates
@@ -55,6 +81,10 @@ class State {
 
 	updatePointerState(updates: Partial<PointerState>) {
 		this.pointerState = { ...this.pointerState, ...updates };
+	}
+
+	updateTouchState(updates: Partial<TouchState>) {
+		this.touchState = { ...this.touchState, ...updates };
 	}
 }
 
