@@ -9,7 +9,8 @@
 	"scripts": {
 		"dev": "bun --filter=client dev",
 		"build": "bun --filter=client build",
-		"preview": "bun --filter=client preview"
+		"preview": "bun --filter=client preview",
+		"deploy": "bun run --filter=client deploy"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0"

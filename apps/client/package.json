@@ -6,7 +6,8 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "vite build",
-		"preview": "vite preview"
+		"preview": "vite preview",
+		"deploy": "bun run build && bunx wrangler pages deploy --project-name zappy-place dist/"
 	},
 	"dependencies": {
 		"@nostr-place/nostr-canvas": "workspace:*",
