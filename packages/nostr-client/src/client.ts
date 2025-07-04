@@ -35,11 +35,6 @@ export class NostrClient {
 	private reconnectTimers: Map<string, NodeJS.Timeout>;
 	private privateKey?: string;
 	private publicKey?: string;
-	private paginationState: {
-		oldestTimestamp?: number;
-		isComplete: boolean;
-		pagesFetched: number;
-	};
 	private isRealTimeSubscriptionActive: boolean = false;
 
 	constructor(config: NostrClientConfig, callbacks: CanvasEventCallbacks = {}) {
@@ -172,18 +167,58 @@ export class NostrClient {
 		this.state.isConnected = connected.length > 0;
 	}
 
-	async fetchHistoricalEvents(): Promise<void> {
+	async fetchHistoricalEvents(until: number = Math.floor(Date.now() / 1000)): Promise<void> {
 		if (this.state.connectedRelays.length === 0) {
 			throw new Error('No connected relays');
 		}
 
-		this.paginationState = {
-			isComplete: false,
-			oldestTimestamp: Math.floor(Date.now() / 1000),
-			pagesFetched: 0
-		};
+		let currentUntil = until;
+		let pagesFetched = 0;
+		const { since, eventsPerPage, requestDelay } = this.config.pagination;
 
-		await this.scheduleFetchNextPage(this.config.pagination);
+		while (true) {
+			const filter: Filter = {
+				kinds: [90001],
+				limit: eventsPerPage,
+				until: currentUntil
+			};
+
+			let pageEvents = 0;
+			let oldestInPage: number | undefined;
+			let resolveFn!: () => void;
+
+			await new Promise<void>((resolve) => {
+				resolveFn = resolve;
+
+				this.pool.subscribe(this.state.connectedRelays, filter, {
+					onevent: (event: NostrEvent) => {
+						if (event.created_at <= since) return;
+
+						pageEvents++;
+						this.handleEvent(event);
+
+						if (!oldestInPage || event.created_at < oldestInPage) {
+							oldestInPage = event.created_at;
+						}
+					},
+					oneose: () => {
+						resolveFn();
+					}
+				});
+			});
+
+			pagesFetched++;
+
+			const noProgress = !oldestInPage || oldestInPage >= currentUntil;
+			const reachedSince = oldestInPage && oldestInPage <= since;
+
+			if (pageEvents === 0 || reachedSince || noProgress) {
+				break;
+			}
+
+			currentUntil = oldestInPage;
+			await new Promise((res) => setTimeout(res, requestDelay));
+		}
 	}
 
 	// Event subscription
@@ -207,78 +242,6 @@ export class NostrClient {
 				this.subscribeToRealTimeEvents();
 			},
 		});
-	}
-
-	private async fetchNextPage(paginationConfig: NostrClientConfig['pagination']): Promise<void> {
-		return new Promise((resolve) => {
-			const filter: Filter = {
-				kinds: [90001],
-				limit: paginationConfig.eventsPerPage
-			};
-
-			// Add until filter if we have an oldest timestamp from previous page
-			if (this.paginationState.oldestTimestamp) {
-				filter.until = this.paginationState.oldestTimestamp;
-			}
-
-			let pageEvents = 0;
-			let oldestInThisPage: number | undefined;
-
-			this.pool.subscribe(this.state.connectedRelays, filter, {
-				onevent: (event: NostrEvent) => {
-					// Skip events that are older than or equal to our "since" timestamp
-					if (event.created_at <= paginationConfig.since) {
-						return;
-					}
-
-					pageEvents++;
-					this.handleEvent(event);
-
-					// Track the oldest timestamp in this page
-					if (!oldestInThisPage || event.created_at < oldestInThisPage) {
-						oldestInThisPage = event.created_at;
-					}
-				},
-				oneose: () => {
-					// Store the previous oldest timestamp to detect if we're making progress
-					const previousOldest = this.paginationState.oldestTimestamp;
-
-					// Update pagination state with the oldest timestamp from this page
-					if (oldestInThisPage) {
-						this.paginationState.oldestTimestamp = oldestInThisPage;
-					}
-
-					this.paginationState.pagesFetched++;
-
-					// Mark pagination as complete if:
-					// 1. We got no events
-					// 2. We've reached or passed the "since" timestamp
-					// 3. We're not making progress (same oldest timestamp as before)
-					if (pageEvents === 0 ||
-						(this.paginationState.oldestTimestamp && this.paginationState.oldestTimestamp <= paginationConfig.since) ||
-						(previousOldest && this.paginationState.oldestTimestamp === previousOldest)) {
-						this.paginationState.isComplete = true;
-					}
-
-					resolve();
-				}
-			});
-		});
-	}
-
-	private async scheduleFetchNextPage(paginationConfig: NostrClientConfig['pagination']): Promise<void> {
-		if (this.paginationState.isComplete) {
-			return;
-		}
-
-		setTimeout(async () => {
-			await this.fetchNextPage(paginationConfig);
-
-			// Schedule next page if not complete
-			if (!this.paginationState.isComplete) {
-				this.scheduleFetchNextPage(paginationConfig);
-			}
-		}, paginationConfig.requestDelay);
 	}
 
 	// Event handling

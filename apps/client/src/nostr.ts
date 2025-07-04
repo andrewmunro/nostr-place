@@ -1,4 +1,4 @@
-import { createDefaultConfig, NostrClient, Pixel } from '../../../packages/zappy-place/dist';
+import { createDefaultConfig, NostrClient, Pixel } from '@zappy-place/nostr-client';
 import { OPTIMSTIC_PIXELS_ENABLED } from './constants';
 import { renderCursor } from './renderer';
 import { state } from './state';
