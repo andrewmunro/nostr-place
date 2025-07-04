@@ -1,4 +1,4 @@
-import { Pixel } from '@nostr-place/nostr-canvas';
+import { Pixel } from '../../../packages/zappy-place/dist';
 import { PRESET_COLORS } from './constants';
 
 

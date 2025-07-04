@@ -10,7 +10,7 @@
 		"deploy": "bun run build && bunx wrangler pages deploy --project-name zappy-place dist/"
 	},
 	"dependencies": {
-		"@nostr-place/nostr-canvas": "workspace:*",
+		"@zappy-place/nostr-client": "workspace:*",
 		"nostr-tools": "^2.0.0",
 		"pixi.js": "^7.3.0"
 	},

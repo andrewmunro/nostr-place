@@ -1,5 +1,5 @@
 {
-	"name": "@nostr-place/nostr-canvas",
+	"name": "@zappy-place/nostr-client",
 	"version": "0.1.0",
 	"type": "module",
 	"main": "dist/index.js",

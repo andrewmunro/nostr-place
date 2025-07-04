@@ -1,5 +1,5 @@
-import { Pixel } from '@nostr-place/nostr-canvas';
 import * as PIXI from 'pixi.js';
+import { Pixel } from '../../../packages/zappy-place/dist';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
 import { nostrService } from './nostr';
 import { updateActionButtons } from './ui';

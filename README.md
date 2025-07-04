@@ -1,4 +1,4 @@
-# 🎨 nostr-place
+# 🎨 zappy-place
 
 A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Place — powered by [Nostr](https://nostr.com) and Lightning ⚡ Zaps.
 
@@ -35,10 +35,10 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
 
 ## 🖼️ Nostr Event Format
 
-### 🧱 Pixel Placement Event (kind: 30001)
+### 🧱 Pixel Placement Event (kind: 90001)
 ```json
 {
-  "kind": 30001,
+  "kind": 90001,
   "pubkey": "<user_pubkey>",
   "created_at": 1234567890,
   "tags": [

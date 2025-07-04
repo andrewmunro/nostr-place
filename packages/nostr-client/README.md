@@ -1,6 +1,6 @@
-# @nostr-place/nostr-canvas
+# @zappy-place/nostr-client
 
-A TypeScript package for managing Nostr-based pixel canvas state with built-in validation and relay communication.
+A TypeScript package for fetching and publishing Nostr events for the zappy-place project.
 
 ## Features
 
@@ -13,7 +13,7 @@ A TypeScript package for managing Nostr-based pixel canvas state with built-in v
 ## Installation
 
 ```bash
-npm install @nostr-place/nostr-canvas
+npm install @zappy-place/nostr-client
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ npm install @nostr-place/nostr-canvas
 ### Basic Setup
 
 ```typescript
-import { NostrClient, createDefaultConfig } from '@nostr-place/nostr-canvas';
+import { NostrClient, createDefaultConfig } from '@zappy-place/nostr-client';
 
 // Create a client with default configuration
 const config = createDefaultConfig();
