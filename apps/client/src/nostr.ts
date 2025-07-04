@@ -16,8 +16,19 @@ function updateUserInfo(publicKey?: string) {
 	if (userInfoEl && publicKey) {
 		userInfoEl.textContent = `🔑 ${publicKey.slice(0, 12)}...`;
 		userInfoEl.classList.remove('hidden');
+	} else if (userInfoEl) {
+		userInfoEl.classList.add('hidden');
 	}
 }
+
+document.addEventListener('nlAuth', async (e) => {
+	try {
+		const publicKey = await window.nostr!.getPublicKey();
+		updateUserInfo(publicKey);
+	} catch (error) {
+		updateUserInfo();
+	}
+})
 
 function isDebugMode(): boolean {
 	const urlParams = new URLSearchParams(window.location.search);
@@ -57,16 +68,6 @@ class NostrService {
 		updateConnectionStatus('🌐 Connecting...');
 
 		try {
-			// Generate or load user keys
-			const keys = this.client.generateKeys();
-			console.log('Generated Nostr keys:', {
-				publicKey: keys.publicKey,
-				// Don't log private key in production
-				hasPrivateKey: !!keys.privateKey
-			});
-
-			updateUserInfo(keys.publicKey);
-
 			// Connect to relays
 			console.log('Connecting to Nostr relays...');
 			await this.client.connect();
@@ -130,12 +131,21 @@ class NostrService {
 			throw new Error('Nostr service not initialized');
 		}
 
+		// Get public key - this will trigger login UI if user isn't authenticated
+		let publicKey: string;
+		try {
+			publicKey = await window.nostr!.getPublicKey();
+			updateUserInfo(publicKey);
+		} catch (error) {
+			throw new Error('Please login to place pixels');
+		}
+
 		const pixel: Pixel = {
 			x,
 			y,
 			color,
 			eventId: `${x}_${y}_${Date.now()}`, // Temporary ID until real event comes back
-			pubkey: this.client.getPublicKey() || 'unknown',
+			pubkey: publicKey,
 			timestamp: Date.now(),
 		};
 
@@ -158,7 +168,7 @@ class NostrService {
 		}
 
 		try {
-			// Publish to Nostr in the background
+			// Use the client's publishPixelEvent method which now uses window.nostr
 			const eventId = await this.client.publishPixelEvent(pixel);
 			console.log(`Published pixel event: ${eventId}`);
 		} catch (error) {
@@ -174,16 +184,13 @@ class NostrService {
 		return `${connected}/${total} relays connected`;
 	}
 
-	getPublicKey(): string | undefined {
-		return this.client.getPublicKey();
-	}
-
 	async disconnect(): Promise<void> {
 		if (this.isInitialized) {
 			await this.client.disconnect();
 			this.isInitialized = false;
-			updateConnectionStatus('🌐 Disconnected');
 		}
+		updateConnectionStatus('🌐 Disconnected');
+		updateUserInfo();
 	}
 }
 

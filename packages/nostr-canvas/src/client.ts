@@ -1,6 +1,6 @@
 import { Filter } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
-import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { finalizeEvent, generateSecretKey, getPublicKey, NostrEvent } from 'nostr-tools/pure';
 import { bytesToHex, hexToBytes } from 'nostr-tools/utils';
 import {
 	CanvasEventCallbacks,
@@ -13,15 +13,17 @@ import {
 } from './types.js';
 import { PixelValidator } from './validator.js';
 
-type NostrEvent = {
-	id: string;
-	kind: number;
-	pubkey: string;
-	created_at: number;
-	tags: string[][];
-	content: string;
-	sig: string;
-};
+// Window.nostr type definitions
+// interface WindowNostr {
+// 	getPublicKey(): Promise<string>;
+// 	signEvent(event: any): Promise<any>;
+// }
+
+// declare global {
+// 	interface Window {
+// 		nostr?: WindowNostr;
+// 	}
+// }
 
 export class NostrClient {
 	private pool: SimplePool;
@@ -360,10 +362,6 @@ export class NostrClient {
 
 	// Event publishing
 	async publishPixelEvent(pixel: Pixel): Promise<string> {
-		if (!this.privateKey) {
-			throw new Error('No private key set. Call generateKeys() or setKeys() first.');
-		}
-
 		if (this.state.connectedRelays.length === 0) {
 			throw new Error('No connected relays');
 		}
@@ -382,8 +380,22 @@ export class NostrClient {
 			event.tags.push(['color', pixel.color]);
 		}
 
-		const privateKeyBytes = hexToBytes(this.privateKey);
-		const signedEvent = finalizeEvent(event, privateKeyBytes);
+		let signedEvent;
+
+		// Try to use window.nostr if available (for nostr-login integration)
+		if (typeof globalThis !== 'undefined' && 'window' in globalThis && (globalThis as any).window?.nostr) {
+			try {
+				signedEvent = await (globalThis as any).window.nostr.signEvent(event);
+			} catch (error) {
+				throw new Error('Failed to sign event with window.nostr');
+			}
+		} else if (this.privateKey) {
+			// Fallback to private key signing
+			const privateKeyBytes = hexToBytes(this.privateKey);
+			signedEvent = finalizeEvent(event, privateKeyBytes);
+		} else {
+			throw new Error('No signing method available. Please login or set private key.');
+		}
 
 		const publishPromises = this.state.connectedRelays.map(relayUrl =>
 			this.pool.publish([relayUrl], signedEvent)
@@ -432,7 +444,7 @@ export class NostrClient {
 export function createDefaultConfig(): NostrClientConfig {
 	return {
 		relays: [
-			// 'wss://relay.damus.io',
+			// 'wss://relay.damus.io', // Rate limited
 			'wss://relay.nostr.band',
 			'wss://relay.primal.net',
 			// 'wss://nos.lol',

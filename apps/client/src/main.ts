@@ -50,8 +50,6 @@ async function init() {
 			// Initialize Nostr connection
 			console.log('Connecting to Nostr...');
 			await nostrService.initialize();
-
-			console.log('🔑 Your public key:', nostrService.getPublicKey());
 			console.log('🌐 Connection status:', nostrService.getConnectionStatus());
 		}
 

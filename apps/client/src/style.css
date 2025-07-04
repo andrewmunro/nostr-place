@@ -57,7 +57,7 @@ body {
 #coordinates-panel {
 	position: absolute;
 	top: 10px;
-	left: 10px;
+	right: 10px;
 	background: rgba(0, 0, 0, 0.6);
 	border-radius: 4px;
 	padding: 4px 8px;
@@ -70,7 +70,7 @@ body {
 #nostr-status-panel {
 	position: absolute;
 	top: 50px;
-	left: 10px;
+	right: 10px;
 	background: rgba(0, 0, 0, 0.6);
 	border-radius: 4px;
 	padding: 4px 8px;
@@ -102,7 +102,7 @@ body {
 #color-palette-container {
 	position: absolute;
 	top: 10px;
-	right: 10px;
+	left: 10px;
 	max-width: 80px;
 	max-height: calc(100vh - 20px);
 	display: flex;
@@ -216,7 +216,7 @@ body {
 #zoom-controls {
 	position: absolute;
 	top: 10px;
-	right: 80px;
+	left: 80px;
 	display: flex;
 	flex-direction: column;
 	gap: 5px;
