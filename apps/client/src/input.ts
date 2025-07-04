@@ -12,7 +12,7 @@ const TOUCH_HOLD_DURATION = 500; // milliseconds to hold for placing pixel
 const TOUCH_MOVE_THRESHOLD = 10; // pixels to move before canceling hold
 const PINCH_THRESHOLD = 10; // minimum distance change to start pinch
 
-export function setupEventListeners() {
+export function setupInput() {
 	// Handle URL changes
 	window.addEventListener('hashchange', loadFromURL);
 

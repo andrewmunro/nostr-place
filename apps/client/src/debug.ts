@@ -1,17 +1,42 @@
-import { Pixel } from '../../../packages/zappy-place/dist';
+import { Pixel } from '@zappy-place/nostr-client';
 import { PRESET_COLORS } from './constants';
+import { state } from './state';
 
+export function isDebugMode(): boolean {
+	const urlParams = new URLSearchParams(window.location.search);
+	return urlParams.has('debug');
+}
 
-export function generateDummyPixels(): Map<string, Pixel> {
+export function initDebugMode() {
+	console.log('🐛 Debug mode enabled - using dummy data');
+
+	// Update UI to show debug status
+	const statusEl = document.getElementById('connection-status');
+	if (statusEl) {
+		statusEl.textContent = '🐛 Debug Mode';
+	}
+
+	const userInfoEl = document.getElementById('user-info');
+	if (userInfoEl) {
+		userInfoEl.textContent = '🎨 Local Development';
+		userInfoEl.classList.remove('hidden');
+	}
+
+	// Load dummy pixels
+	state.pixels = generateDummyPixels();
+	state.textureNeedsUpdate = true;
+}
+
+function generateDummyPixels(): Map<string, Pixel> {
 	const pixels = new Map<string, Pixel>();
 
 	// Create a test pattern inspired by the orange/white theme
 
 	// 1. Draw some colored borders around the canvas
-	drawBorder(pixels, 0, 0, 2000, 50, PRESET_COLORS[27]); // Orange border (#FF7000)
-	drawBorder(pixels, 0, 1950, 2000, 50, PRESET_COLORS[27]); // Orange border
-	drawBorder(pixels, 0, 0, 50, 2000, PRESET_COLORS[27]); // Orange border
-	drawBorder(pixels, 1950, 0, 50, 2000, PRESET_COLORS[27]); // Orange border
+	drawBorder(pixels, 0, 0, 2000, 50, PRESET_COLORS[27]!); // Orange border (#FF7000)
+	drawBorder(pixels, 0, 1950, 2000, 50, PRESET_COLORS[27]!); // Orange border
+	drawBorder(pixels, 0, 0, 50, 2000, PRESET_COLORS[27]!); // Orange border
+	drawBorder(pixels, 1950, 0, 50, 2000, PRESET_COLORS[27]!); // Orange border
 
 	// 2. Create some geometric patterns in the center
 	const centerX = 1000;
@@ -21,14 +46,14 @@ export function generateDummyPixels(): Map<string, Pixel> {
 	const squareColors = [PRESET_COLORS[13], PRESET_COLORS[29], PRESET_COLORS[54], PRESET_COLORS[22], PRESET_COLORS[45]]; // Green, red, blue, yellow, purple
 	for (let i = 0; i < 5; i++) {
 		const size = 100 + i * 50;
-		const color = squareColors[i];
+		const color = squareColors[i]!;
 		drawSquareOutline(pixels, centerX - size / 2, centerY - size / 2, size, color);
 	}
 
 	// 3. Create some test areas with different patterns
 
 	// Checkerboard pattern (top-left) - white and black
-	createCheckerboard(pixels, 100, 100, 200, 200, PRESET_COLORS[0], PRESET_COLORS[8]); // white and black
+	createCheckerboard(pixels, 100, 100, 200, 200, PRESET_COLORS[0]!, PRESET_COLORS[8]!); // white and black
 
 	// Gradient-like pattern (top-right)
 	createGradient(pixels, 1500, 100, 300, 200);
@@ -40,14 +65,14 @@ export function generateDummyPixels(): Map<string, Pixel> {
 	createTextPattern(pixels, 1400, 1600, 'NOSTR');
 
 	// 4. Add some guide lines - gray
-	drawLine(pixels, 1000, 0, 1000, 2000, PRESET_COLORS[3]); // Vertical center line (gray)
-	drawLine(pixels, 0, 1000, 2000, 1000, PRESET_COLORS[3]); // Horizontal center line (gray)
+	drawLine(pixels, 1000, 0, 1000, 2000, PRESET_COLORS[3]!); // Vertical center line (gray)
+	drawLine(pixels, 0, 1000, 2000, 1000, PRESET_COLORS[3]!); // Horizontal center line (gray)
 
 	// 5. Corner markers for navigation testing
-	drawCornerMarker(pixels, 50, 50, PRESET_COLORS[29]); // red
-	drawCornerMarker(pixels, 1950, 50, PRESET_COLORS[13]); // green
-	drawCornerMarker(pixels, 50, 1950, PRESET_COLORS[54]); // blue
-	drawCornerMarker(pixels, 1950, 1950, PRESET_COLORS[22]); // yellow
+	drawCornerMarker(pixels, 50, 50, PRESET_COLORS[29]!); // red
+	drawCornerMarker(pixels, 1950, 50, PRESET_COLORS[13]!); // green
+	drawCornerMarker(pixels, 50, 1950, PRESET_COLORS[54]!); // blue
+	drawCornerMarker(pixels, 1950, 1950, PRESET_COLORS[22]!); // yellow
 
 	console.log(`Generated ${pixels.size} dummy pixels for testing`);
 	return pixels;
@@ -106,7 +131,7 @@ function createGradient(pixels: Map<string, Pixel>, x: number, y: number, width:
 
 			// Use a combination of position to select from preset colors
 			const colorIndex = Math.floor((xRatio * 8 + yRatio * 8) % PRESET_COLORS.length);
-			const color = PRESET_COLORS[colorIndex];
+			const color = PRESET_COLORS[colorIndex]!;
 			setPixel(pixels, x + px, y + py, color);
 		}
 	}
@@ -117,7 +142,7 @@ function createRandomDots(pixels: Map<string, Pixel>, x: number, y: number, widt
 	for (let i = 0; i < numDots; i++) {
 		const px = Math.floor(Math.random() * width);
 		const py = Math.floor(Math.random() * height);
-		const color = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
+		const color = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]!;
 		setPixel(pixels, x + px, y + py, color);
 	}
 }
@@ -179,7 +204,7 @@ function createTextPattern(pixels: Map<string, Pixel>, x: number, y: number, tex
 			for (let row = 0; row < pattern.length; row++) {
 				for (let col = 0; col < pattern[row].length; col++) {
 					if (pattern[row][col]) {
-						setPixel(pixels, x + offsetX + col * 8, y + row * 8, PRESET_COLORS[8]); // black
+						setPixel(pixels, x + offsetX + col * 8, y + row * 8, PRESET_COLORS[8]!); // black
 					}
 				}
 			}

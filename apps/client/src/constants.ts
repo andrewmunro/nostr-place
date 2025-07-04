@@ -5,10 +5,6 @@ export const MAX_SCALE = 400; // Reasonable maximum zoom
 export const DEFAULT_SCALE = 25;
 export const OPTIMSTIC_PIXELS_ENABLED = false;
 
-// Color palette constants
-export const COLORS_PER_ROW = 2;
-export const SCROLL_STEP = 2; // Reduced scroll step for smoother navigation
-
 export const PRESET_COLORS = [
 	null,
 	'#FFFFFF', '#C4C4C4', '#A6A6A6', '#888888', '#6F6F6F', '#555555', '#3A3A3A', '#222222',

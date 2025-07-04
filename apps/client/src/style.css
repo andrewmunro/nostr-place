@@ -281,12 +281,18 @@ body {
 }
 
 .action-btn:disabled:hover {
-	background: var(--panel-bg);
 	transform: none;
+	cursor: not-allowed;
 }
 
 .color-btn.clear-color {
-	background: #FFFFFF;
+	background-color: transparent;
+	background-image: linear-gradient(to bottom right,
+			#FFFFFF,
+			#FFFFFF),
+		linear-gradient(to bottom left,
+			#FFFFFF,
+			#FFFFFF);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -330,4 +336,15 @@ body {
 	-webkit-user-select: none;
 	-moz-user-select: none;
 	-ms-user-select: none;
+}
+
+.footer {
+	position: fixed;
+	bottom: 0;
+	right: 0;
+	padding: 1rem;
+	text-align: right;
+	font-size: 0.875rem;
+	color: var(--text-secondary);
+	z-index: 100;
 }

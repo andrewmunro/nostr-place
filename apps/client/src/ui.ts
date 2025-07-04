@@ -1,6 +1,10 @@
 import { updateCoordinatesDisplay, zoomIn, zoomOut } from './camera';
-import { COLORS_PER_ROW, PRESET_COLORS, SCROLL_STEP } from './constants';
+import { PRESET_COLORS } from './constants';
 import { state } from './state';
+
+// Color palette constants
+const COLORS_PER_ROW = 2;
+const SCROLL_STEP = 2; // Reduced scroll step for smoother navigation
 
 export function setupUI() {
 	setupColorPalette();
@@ -73,6 +77,24 @@ function setupActionControls() {
 
 	// Initial state
 	updateActionButtons();
+}
+
+// UI update functions
+export function updateConnectionStatus(status: string) {
+	const statusEl = document.getElementById('connection-status');
+	if (statusEl) {
+		statusEl.textContent = status;
+	}
+}
+
+export function updateUserInfo(publicKey?: string) {
+	const userInfoEl = document.getElementById('user-info');
+	if (userInfoEl && publicKey) {
+		userInfoEl.textContent = `🔑 ${publicKey.slice(0, 12)}...`;
+		userInfoEl.classList.remove('hidden');
+	} else if (userInfoEl) {
+		userInfoEl.classList.add('hidden');
+	}
 }
 
 export function selectColor(color: string | null) {

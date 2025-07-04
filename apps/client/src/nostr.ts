@@ -2,33 +2,7 @@ import { createDefaultConfig, NostrClient, Pixel } from '@zappy-place/nostr-clie
 import { OPTIMSTIC_PIXELS_ENABLED } from './constants';
 import { renderCursor } from './renderer';
 import { state } from './state';
-
-// UI update functions
-function updateConnectionStatus(status: string) {
-	const statusEl = document.getElementById('connection-status');
-	if (statusEl) {
-		statusEl.textContent = status;
-	}
-}
-
-function updateUserInfo(publicKey?: string) {
-	const userInfoEl = document.getElementById('user-info');
-	if (userInfoEl && publicKey) {
-		userInfoEl.textContent = `🔑 ${publicKey.slice(0, 12)}...`;
-		userInfoEl.classList.remove('hidden');
-	} else if (userInfoEl) {
-		userInfoEl.classList.add('hidden');
-	}
-}
-
-document.addEventListener('nlAuth', async (e) => {
-	try {
-		const publicKey = await window.nostr!.getPublicKey();
-		updateUserInfo(publicKey);
-	} catch (error) {
-		updateUserInfo();
-	}
-})
+import { updateConnectionStatus, updateUserInfo } from './ui';
 
 function isDebugMode(): boolean {
 	const urlParams = new URLSearchParams(window.location.search);
