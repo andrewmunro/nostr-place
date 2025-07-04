@@ -1,91 +1,8 @@
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
 import { state } from './state';
 
-// Animation state for smooth zoom
-let isAnimating = false;
-let animationId: number | null = null;
-let startScale = 1;
-let targetScale = 1;
-let animationProgress = 0;
-const ANIMATION_DURATION = 200; // milliseconds
-
 function lerp(start: number, end: number, t: number): number {
 	return start + (end - start) * t;
-}
-
-function easeOutQuad(t: number): number {
-	return 1 - (1 - t) * (1 - t);
-}
-
-function animateZoom(timestamp: number) {
-	if (!isAnimating) return;
-
-	animationProgress = Math.min(1, animationProgress + (16 / ANIMATION_DURATION)); // Assume 60fps
-	const easedProgress = easeOutQuad(animationProgress);
-	const currentScale = lerp(startScale, targetScale, easedProgress);
-
-	state.updateCamera({ scale: currentScale });
-
-	if (animationProgress >= 1) {
-		isAnimating = false;
-		animationId = null;
-	} else {
-		animationId = requestAnimationFrame(animateZoom);
-	}
-}
-
-function startZoomAnimation(newTargetScale: number) {
-	if (isAnimating && animationId) {
-		cancelAnimationFrame(animationId);
-	}
-
-	startScale = state.camera.scale;
-	targetScale = newTargetScale;
-	animationProgress = 0;
-	isAnimating = true;
-	animationId = requestAnimationFrame(animateZoom);
-}
-
-export function smoothZoomToPoint(targetScale: number, screenX: number, screenY: number) {
-	if (isAnimating && animationId) {
-		cancelAnimationFrame(animationId);
-	}
-
-	const worldPosBeforeZoom = screenToWorld(screenX, screenY);
-
-	startScale = state.camera.scale;
-	targetScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, targetScale));
-	animationProgress = 0;
-	isAnimating = true;
-
-	// Store the zoom point for the animation
-	const zoomPoint = { screenX, screenY, worldPos: worldPosBeforeZoom };
-
-	function animateZoomToPoint() {
-		if (!isAnimating) return;
-
-		animationProgress = Math.min(1, animationProgress + (16 / ANIMATION_DURATION));
-		const easedProgress = easeOutQuad(animationProgress);
-		const currentScale = lerp(startScale, targetScale, easedProgress);
-
-		state.updateCamera({ scale: currentScale });
-
-		// Adjust camera position to keep the same world position under the zoom point
-		const worldPosAfterZoom = screenToWorld(zoomPoint.screenX, zoomPoint.screenY);
-		state.updateCamera({
-			x: state.camera.x + zoomPoint.worldPos.x - worldPosAfterZoom.x,
-			y: state.camera.y + zoomPoint.worldPos.y - worldPosAfterZoom.y
-		});
-
-		if (animationProgress >= 1) {
-			isAnimating = false;
-			animationId = null;
-		} else {
-			animationId = requestAnimationFrame(animateZoomToPoint);
-		}
-	}
-
-	animationId = requestAnimationFrame(animateZoomToPoint);
 }
 
 function clampCamera() {
@@ -95,6 +12,13 @@ function clampCamera() {
 }
 
 export function updateCamera() {
+	// Smooth interpolation towards target values
+	const lerpFactor = 0.1; // Adjust this value to control animation speed
+
+	state.camera.x = lerp(state.camera.x, state.camera.targetX, lerpFactor);
+	state.camera.y = lerp(state.camera.y, state.camera.targetY, lerpFactor);
+	state.camera.scale = lerp(state.camera.scale, state.camera.targetScale, lerpFactor);
+
 	clampCamera();
 
 	const centerX = state.app.screen.width / 2;
@@ -103,6 +27,26 @@ export function updateCamera() {
 	state.app.stage.children[0].position.set(centerX, centerY); // viewport
 	state.app.stage.children[0].scale.set(state.camera.scale);
 	state.app.stage.children[0].pivot.set(state.camera.x, state.camera.y);
+}
+
+export function smoothZoomToPoint(targetScale: number, screenX: number, screenY: number) {
+	const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, targetScale));
+
+	// Calculate world position at the mouse cursor with current scale
+	const worldPosBeforeZoom = screenToWorld(screenX, screenY);
+
+	// Calculate what the world position would be at the target scale with current camera position
+	const centerX = state.app.screen.width / 2;
+	const centerY = state.app.screen.height / 2;
+	const worldPosAfterZoom = {
+		x: state.camera.x + (screenX - centerX) / clampedScale,
+		y: state.camera.y + (screenY - centerY) / clampedScale
+	};
+
+	// Set target scale and adjust camera position to keep the same world position under the zoom point
+	state.camera.targetScale = clampedScale;
+	state.camera.targetX = state.camera.x + worldPosBeforeZoom.x - worldPosAfterZoom.x;
+	state.camera.targetY = state.camera.y + worldPosBeforeZoom.y - worldPosAfterZoom.y;
 }
 
 export function screenToWorld(screenX: number, screenY: number) {
@@ -135,11 +79,11 @@ export function getCenterPixel() {
 export function zoomIn() {
 	const zoomFactor = 1.4;
 	const newScale = Math.min(MAX_SCALE, state.camera.scale * zoomFactor);
-	startZoomAnimation(newScale);
+	state.camera.targetScale = newScale;
 }
 
 export function zoomOut() {
 	const zoomFactor = 1 / 1.4;
 	const newScale = Math.max(MIN_SCALE, state.camera.scale * zoomFactor);
-	startZoomAnimation(newScale);
+	state.camera.targetScale = newScale;
 } 

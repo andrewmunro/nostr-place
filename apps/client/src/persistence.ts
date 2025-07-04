@@ -1,18 +1,29 @@
 import { MAX_SCALE, MIN_SCALE } from './constants';
 import { state } from './state';
 
-function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
+function throttle<T extends (...args: any[]) => void>(func: T, delay: number): T {
+	let lastCallTime = 0;
 	let timeoutId: number | null = null;
 
 	return ((...args: Parameters<T>) => {
-		if (timeoutId !== null) {
-			clearTimeout(timeoutId);
-		}
+		const now = Date.now();
+		const timeSinceLastCall = now - lastCallTime;
 
-		timeoutId = window.setTimeout(() => {
+		if (timeSinceLastCall >= delay) {
+			// Execute immediately if enough time has passed
+			lastCallTime = now;
 			func(...args);
-			timeoutId = null;
-		}, delay);
+		} else {
+			// Schedule execution for the remaining time
+			if (timeoutId !== null) {
+				clearTimeout(timeoutId);
+			}
+			timeoutId = window.setTimeout(() => {
+				lastCallTime = Date.now();
+				func(...args);
+				timeoutId = null;
+			}, delay - timeSinceLastCall);
+		}
 	}) as T;
 }
 
@@ -23,7 +34,7 @@ function updateURLImmediate() {
 	}
 }
 
-export const updateURL = debounce(updateURLImmediate, 50);
+export const updateURL = throttle(updateURLImmediate, 50);
 
 export function loadFromURL() {
 	const hash = window.location.hash.slice(1);

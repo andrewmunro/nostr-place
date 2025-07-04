@@ -7,6 +7,9 @@ export interface CameraState {
 	x: number;
 	y: number;
 	scale: number;
+	targetX: number;
+	targetY: number;
+	targetScale: number;
 }
 
 export interface PointerState {
@@ -66,7 +69,10 @@ class State {
 	camera: CameraState = {
 		x: WORLD_SIZE / 2,
 		y: WORLD_SIZE / 2,
-		scale: DEFAULT_SCALE
+		scale: DEFAULT_SCALE,
+		targetX: WORLD_SIZE / 2,
+		targetY: WORLD_SIZE / 2,
+		targetScale: DEFAULT_SCALE
 	};
 
 	// Pointer interaction state
@@ -91,6 +97,10 @@ class State {
 	// Helper methods for complex updates
 	updateCamera(updates: Partial<CameraState>) {
 		this.camera = { ...this.camera, ...updates };
+		// Also update target values to prevent conflicts with smooth interpolation
+		if (updates.x !== undefined) this.camera.targetX = updates.x;
+		if (updates.y !== undefined) this.camera.targetY = updates.y;
+		if (updates.scale !== undefined) this.camera.targetScale = updates.scale;
 	}
 
 	updatePointerState(updates: Partial<PointerState>) {
