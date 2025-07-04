@@ -2,7 +2,6 @@ import { Pixel } from '@zappy-place/nostr-client';
 import * as PIXI from 'pixi.js';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
 import { nostrService } from './nostr';
-import { updateActionButtons } from './ui';
 
 export interface CameraState {
 	x: number;
@@ -114,8 +113,6 @@ class State {
 		if (this.undoHistory.length > this.maxUndoHistory) {
 			this.undoHistory.shift();
 		}
-
-		updateActionButtons();
 	}
 
 	undoLastAction() {
@@ -123,7 +120,6 @@ class State {
 		if (!lastAction) return;
 
 		nostrService.publishPixel(lastAction.x, lastAction.y, lastAction.previousColor, true);
-		updateActionButtons();
 	}
 }
 

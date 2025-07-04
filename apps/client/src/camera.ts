@@ -1,6 +1,4 @@
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
-import { updateURL } from './persistence';
-import { renderWorld } from './renderer';
 import { state } from './state';
 
 // Animation state for smooth zoom
@@ -27,14 +25,10 @@ function animateZoom(timestamp: number) {
 	const currentScale = lerp(startScale, targetScale, easedProgress);
 
 	state.updateCamera({ scale: currentScale });
-	updateCamera();
-	updateCoordinatesDisplay();
-	renderWorld();
 
 	if (animationProgress >= 1) {
 		isAnimating = false;
 		animationId = null;
-		updateURL(); // Only update URL once at the end
 	} else {
 		animationId = requestAnimationFrame(animateZoom);
 	}
@@ -83,14 +77,9 @@ export function smoothZoomToPoint(targetScale: number, screenX: number, screenY:
 			y: state.camera.y + zoomPoint.worldPos.y - worldPosAfterZoom.y
 		});
 
-		updateCamera();
-		updateCoordinatesDisplay();
-		renderWorld();
-
 		if (animationProgress >= 1) {
 			isAnimating = false;
 			animationId = null;
-			updateURL(); // Only update URL once at the end
 		} else {
 			animationId = requestAnimationFrame(animateZoomToPoint);
 		}
@@ -99,7 +88,7 @@ export function smoothZoomToPoint(targetScale: number, screenX: number, screenY:
 	animationId = requestAnimationFrame(animateZoomToPoint);
 }
 
-export function clampCamera() {
+function clampCamera() {
 	// Clamp camera position to world bounds
 	state.camera.x = Math.max(0, Math.min(WORLD_SIZE, state.camera.x));
 	state.camera.y = Math.max(0, Math.min(WORLD_SIZE, state.camera.y));
@@ -141,18 +130,6 @@ export function getCenterPixel() {
 		x: Math.floor(state.camera.x),
 		y: Math.floor(state.camera.y)
 	};
-}
-
-export function updateCoordinatesDisplay(x?: number, y?: number) {
-	const coordsDisplay = document.getElementById('coordinates')!;
-
-	if (x !== undefined && y !== undefined) {
-		coordsDisplay.textContent = `${x},${y}`;
-	} else {
-		// Always show center pixel coordinates
-		const centerPixel = getCenterPixel();
-		coordsDisplay.textContent = `${centerPixel.x},${centerPixel.y}`;
-	}
 }
 
 export function zoomIn() {

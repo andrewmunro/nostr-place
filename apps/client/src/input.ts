@@ -1,9 +1,8 @@
 import * as PIXI from 'pixi.js';
-import { getCenterPixel, screenToWorld, smoothZoomToPoint, updateCamera as updateCameraView, updateCoordinatesDisplay } from './camera';
+import { getCenterPixel, screenToWorld, smoothZoomToPoint } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
 import { nostrService } from './nostr';
-import { loadFromURL, updateURL } from './persistence';
-import { renderCursor, renderWorld } from './renderer';
+import { loadFromURL } from './persistence';
 import { state } from './state';
 import { updatePaletteLayout } from './ui';
 
@@ -92,11 +91,6 @@ function handlePinchGesture() {
 		x: state.camera.x + worldPosBeforeZoom.x - worldPosAfterZoom.x,
 		y: state.camera.y + worldPosBeforeZoom.y - worldPosAfterZoom.y
 	});
-
-	updateCameraView();
-	updateURL();
-	updateCoordinatesDisplay();
-	renderWorld();
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -124,10 +118,6 @@ function handleKeyDown(event: KeyboardEvent) {
 	}
 
 	event.preventDefault();
-	updateCameraView();
-	updateURL();
-	updateCoordinatesDisplay();
-	renderWorld();
 }
 
 function startTouchHold(globalPos: { x: number; y: number }) {
@@ -260,11 +250,6 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 		state.updatePointerState({
 			lastPos: { x: globalPos.x, y: globalPos.y }
 		});
-
-		updateCameraView();
-		updateURL();
-		updateCoordinatesDisplay();
-		renderWorld();
 	} else if (event.pointerType !== 'touch') {
 		// Update mouse cursor position and coordinates display for mouse events
 		const worldPos = screenToWorld(globalPos.x, globalPos.y);
@@ -280,13 +265,6 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 				mouseCursorPixel: null
 			});
 		}
-
-		updateCoordinatesDisplay(pixelX, pixelY);
-		renderCursor();
-	} else {
-		// For touch events when not dragging, update coordinates display for center pixel
-		updateCoordinatesDisplay();
-		renderCursor();
 	}
 }
 
@@ -347,8 +325,6 @@ function handlePointerLeave(event: PIXI.FederatedPointerEvent) {
 	// Stop dragging
 	state.updatePointerState({ isDragging: false });
 	(state.app.view as HTMLCanvasElement).style.cursor = 'default';
-
-	renderCursor();
 }
 
 function handleWheel(event: PIXI.FederatedWheelEvent) {
@@ -363,7 +339,4 @@ function handleWheel(event: PIXI.FederatedWheelEvent) {
 
 function handleResize() {
 	state.app.renderer.resize(window.innerWidth, window.innerHeight); // Full window height
-	updateCameraView();
-	renderWorld();
-	updatePaletteLayout(); // Update palette layout on resize
 } 

@@ -1,33 +1,40 @@
+import { updateCamera } from './camera';
 import { initDebugMode, isDebugMode } from './debug';
 import { setupInput } from './input';
 import { nostrService } from './nostr';
 import { loadFromURL, updateURL } from './persistence';
-import { renderWorld, setupPixiJS } from './renderer';
+import { setupRenderer, updateRenderer } from './renderer';
+import { state } from './state';
 import './style.css';
-import { setupUI, updateUserInfo } from './ui';
+import { setupUI, setUserInfo, updateUI } from './ui';
 
 // Update user info when authenticated
 document.addEventListener('nlAuth', async (e) => {
 	try {
 		const publicKey = await window.nostr!.getPublicKey();
-		updateUserInfo(publicKey);
+		setUserInfo(publicKey);
 	} catch (error) {
-		updateUserInfo();
+		setUserInfo();
 	}
 });
+
+function updateLoop() {
+	updateCamera();
+	updateUI();
+	updateURL();
+	updateRenderer();
+}
 
 // Initialize the application
 async function init() {
 
 	console.log('Initializing Nostr Place...');
-
+	await setupRenderer();
 	setupUI();
-	await setupPixiJS();
 	setupInput();
-
 	loadFromURL();
-	updateURL();
-	renderWorld();
+
+	state.app.ticker.add(updateLoop);
 
 	try {
 		// Check for debug mode

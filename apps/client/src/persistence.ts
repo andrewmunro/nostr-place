@@ -1,6 +1,4 @@
-import { clampCamera, updateCamera as updateCameraView, updateCoordinatesDisplay } from './camera';
 import { MAX_SCALE, MIN_SCALE } from './constants';
-import { renderWorld } from './renderer';
 import { state } from './state';
 
 function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
@@ -41,10 +39,4 @@ export function loadFromURL() {
 		const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, parseFloat(scale)));
 		state.updateCamera({ scale: newScale });
 	}
-
-	// Clamp camera after loading from URL in case of invalid coordinates
-	clampCamera();
-	updateCameraView();
-	updateCoordinatesDisplay();
-	renderWorld();
 } 

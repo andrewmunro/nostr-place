@@ -3,7 +3,7 @@ import { screenToWorld } from './camera';
 import { WORLD_SIZE } from './constants';
 import { state } from './state';
 
-export async function setupPixiJS() {
+export async function setupRenderer() {
 	const newApp = new PIXI.Application({
 		width: window.innerWidth,
 		height: window.innerHeight, // Full window height since UI is overlaid
@@ -40,7 +40,13 @@ export async function setupPixiJS() {
 	state.app.stage.hitArea = new PIXI.Rectangle(0, 0, state.app.screen.width, state.app.screen.height);
 }
 
-export function setupPixelTexture() {
+export function updateRenderer() {
+	updatePixelTexture(); // Update pixel texture if needed
+	renderGrid();
+	renderCursor();
+}
+
+function setupPixelTexture() {
 	// Create a canvas for pixel texture
 	const canvas = document.createElement('canvas');
 	canvas.width = WORLD_SIZE;
@@ -68,7 +74,7 @@ export function setupPixelTexture() {
 	updatePixelTexture();
 }
 
-export function updatePixelTexture() {
+function updatePixelTexture() {
 	if (!state.textureNeedsUpdate) return;
 
 	// Clear the canvas
@@ -87,13 +93,7 @@ export function updatePixelTexture() {
 	state.textureNeedsUpdate = false;
 }
 
-export function renderWorld() {
-	updatePixelTexture(); // Update pixel texture if needed
-	renderGrid();
-	renderCursor();
-}
-
-export function renderGrid() {
+function renderGrid() {
 	state.gridContainer.removeChildren();
 
 	// Only render grid if zoomed in enough
@@ -126,7 +126,7 @@ export function renderGrid() {
 	state.gridContainer.addChild(graphics);
 }
 
-export function renderCursor() {
+function renderCursor() {
 	// Remove any existing cursor graphics (keep the texture sprite)
 	const children = [...state.pixelContainer.children];
 	children.forEach(child => {

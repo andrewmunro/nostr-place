@@ -1,4 +1,4 @@
-import { updateCoordinatesDisplay, zoomIn, zoomOut } from './camera';
+import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
 import { state } from './state';
 
@@ -14,9 +14,11 @@ export function setupUI() {
 
 	// Initial palette layout update
 	setTimeout(() => updatePaletteLayout(), 0);
+}
 
-	// Update coordinates display
+export function updateUI() {
 	updateCoordinatesDisplay();
+	updateActionButtons();
 }
 
 function setupColorPalette() {
@@ -74,20 +76,17 @@ function setupActionControls() {
 	undoBtn.addEventListener('click', () => {
 		state.undoLastAction();
 	});
-
-	// Initial state
-	updateActionButtons();
 }
 
 // UI update functions
-export function updateConnectionStatus(status: string) {
+export function setConnectionStatus(status: string) {
 	const statusEl = document.getElementById('connection-status');
 	if (statusEl) {
 		statusEl.textContent = status;
 	}
 }
 
-export function updateUserInfo(publicKey?: string) {
+export function setUserInfo(publicKey?: string) {
 	const userInfoEl = document.getElementById('user-info');
 	if (userInfoEl && publicKey) {
 		userInfoEl.textContent = `🔑 ${publicKey.slice(0, 12)}...`;
@@ -97,7 +96,7 @@ export function updateUserInfo(publicKey?: string) {
 	}
 }
 
-export function selectColor(color: string | null) {
+function selectColor(color: string | null) {
 	state.selectedColor = color;
 
 	// Update UI
@@ -109,7 +108,7 @@ export function selectColor(color: string | null) {
 	});
 }
 
-export function scrollPalette(direction: number) {
+function scrollPalette(direction: number) {
 	const totalRows = Math.ceil(PRESET_COLORS.length / COLORS_PER_ROW);
 	const buttonHeight = 28;
 	const scrollButtonHeight = 28;
@@ -177,7 +176,7 @@ export function updatePaletteLayout() {
 	colorPalette.style.transform = `translateY(-${scrollPixels}px)`;
 }
 
-export function updateActionButtons() {
+function updateActionButtons() {
 	const undoBtn = document.getElementById('undo-btn')! as HTMLButtonElement;
 
 	// Update undo button state
@@ -188,4 +187,16 @@ export function updateActionButtons() {
 		undoBtn.disabled = true;
 		undoBtn.title = 'No actions to undo';
 	}
-} 
+}
+
+function updateCoordinatesDisplay(x?: number, y?: number) {
+	const coordsDisplay = document.getElementById('coordinates')!;
+
+	if (x !== undefined && y !== undefined) {
+		coordsDisplay.textContent = `${x},${y}`;
+	} else {
+		// Always show center pixel coordinates
+		const centerPixel = getCenterPixel();
+		coordsDisplay.textContent = `${centerPixel.x},${centerPixel.y}`;
+	}
+}

@@ -1,8 +1,7 @@
 import { createDefaultConfig, NostrClient, Pixel } from '@zappy-place/nostr-client';
 import { OPTIMSTIC_PIXELS_ENABLED } from './constants';
-import { renderCursor } from './renderer';
 import { state } from './state';
-import { updateConnectionStatus, updateUserInfo } from './ui';
+import { setConnectionStatus, setUserInfo } from './ui';
 
 function isDebugMode(): boolean {
 	const urlParams = new URLSearchParams(window.location.search);
@@ -26,20 +25,20 @@ class NostrService {
 			},
 			onError: (error, context) => {
 				console.error(`Nostr error in ${context}:`, error);
-				updateConnectionStatus('❌ Connection error');
+				setConnectionStatus('❌ Connection error');
 			}
 		});
 	}
 
 	private updateConnectionUI() {
 		const status = this.getConnectionStatus();
-		updateConnectionStatus(`🌐 ${status}`);
+		setConnectionStatus(`🌐 ${status}`);
 	}
 
 	async initialize(): Promise<void> {
 		if (this.isInitialized) return;
 
-		updateConnectionStatus('🌐 Connecting...');
+		setConnectionStatus('🌐 Connecting...');
 
 		try {
 			// Connect to relays
@@ -57,7 +56,7 @@ class NostrService {
 			this.updateConnectionUI();
 		} catch (error) {
 			console.error('Failed to initialize Nostr service:', error);
-			updateConnectionStatus('❌ Connection failed');
+			setConnectionStatus('❌ Connection failed');
 			throw error;
 		}
 	}
@@ -77,7 +76,6 @@ class NostrService {
 
 		state.pixelTexture.update();
 
-		renderCursor();
 		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}`);
 	}
 
@@ -109,7 +107,7 @@ class NostrService {
 		let publicKey: string;
 		try {
 			publicKey = await window.nostr!.getPublicKey();
-			updateUserInfo(publicKey);
+			setUserInfo(publicKey);
 		} catch (error) {
 			throw new Error('Please login to place pixels');
 		}
@@ -163,8 +161,8 @@ class NostrService {
 			await this.client.disconnect();
 			this.isInitialized = false;
 		}
-		updateConnectionStatus('🌐 Disconnected');
-		updateUserInfo();
+		setConnectionStatus('🌐 Disconnected');
+		setUserInfo();
 	}
 }
 
