@@ -3,6 +3,10 @@ import { screenToWorld } from './camera';
 import { WORLD_SIZE } from './constants';
 import { state } from './state';
 
+// Cache for reusable graphics objects
+let gridGraphics: PIXI.Graphics | null = null;
+let cursorGraphics: PIXI.Graphics | null = null;
+
 export async function setupRenderer() {
 	const newApp = new PIXI.Application({
 		width: window.innerWidth,
@@ -94,13 +98,25 @@ function updatePixelTexture() {
 }
 
 function renderGrid() {
-	state.gridContainer.removeChildren();
-
 	// Only render grid if zoomed in enough
-	if (state.camera.scale < 2) return;
+	if (state.camera.scale < 2) {
+		// Hide grid if not zoomed in
+		if (gridGraphics) {
+			gridGraphics.visible = false;
+		}
+		return;
+	}
 
-	const graphics = new PIXI.Graphics();
-	graphics.lineStyle(1 / state.camera.scale, 0x888888, 0.3);
+	// Create grid graphics if it doesn't exist
+	if (!gridGraphics) {
+		gridGraphics = new PIXI.Graphics();
+		state.gridContainer.addChild(gridGraphics);
+	}
+
+	// Show and clear the graphics
+	gridGraphics.visible = true;
+	gridGraphics.clear();
+	gridGraphics.lineStyle(1 / state.camera.scale, 0x888888, 0.3);
 
 	// Calculate visible area
 	const topLeft = screenToWorld(0, 0);
@@ -113,54 +129,62 @@ function renderGrid() {
 
 	// Draw vertical lines
 	for (let x = startX; x <= endX; x++) {
-		graphics.moveTo(x, startY);
-		graphics.lineTo(x, endY);
+		gridGraphics.moveTo(x, startY);
+		gridGraphics.lineTo(x, endY);
 	}
 
 	// Draw horizontal lines
 	for (let y = startY; y <= endY; y++) {
-		graphics.moveTo(startX, y);
-		graphics.lineTo(endX, y);
+		gridGraphics.moveTo(startX, y);
+		gridGraphics.lineTo(endX, y);
 	}
-
-	state.gridContainer.addChild(graphics);
 }
 
 function renderCursor() {
-	// Remove any existing cursor graphics (keep the texture sprite)
-	const children = [...state.pixelContainer.children];
-	children.forEach(child => {
-		if (child !== state.pixelSprite) {
-			state.pixelContainer.removeChild(child);
-		}
-	});
-
 	// Only show cursor when zoomed in enough
-	if (state.camera.scale >= 2) {
-		let cursorPixelX: number | null = null;
-		let cursorPixelY: number | null = null;
-
-		// Show cursor at mouse position if mouse cursor is being tracked
-		if (state.pointerState.mouseCursorPixel) {
-			cursorPixelX = state.pointerState.mouseCursorPixel.x;
-			cursorPixelY = state.pointerState.mouseCursorPixel.y;
-		} else if (state.touchState.activeTouches.size > 0 || state.touchState.holdTimer !== null || state.touchState.hasTouchBeenUsed) {
-			// Show cursor at center for touch controls (when touches are active, during hold, or if touch has been used)
-			cursorPixelX = Math.floor(state.camera.x);
-			cursorPixelY = Math.floor(state.camera.y);
+	if (state.camera.scale < 2) {
+		// Hide cursor if not zoomed in
+		if (cursorGraphics) {
+			cursorGraphics.visible = false;
 		}
-		// If no mouse cursor and no touch interaction, don't show cursor at all
+		return;
+	}
 
-		// Only show cursor if we have valid coordinates and pixel is within world bounds
-		if (cursorPixelX !== null && cursorPixelY !== null &&
-			cursorPixelX >= 0 && cursorPixelX < WORLD_SIZE &&
-			cursorPixelY >= 0 && cursorPixelY < WORLD_SIZE) {
-			const cursorGraphics = new PIXI.Graphics();
-			cursorGraphics.lineStyle(2 / state.camera.scale, 0x000000, 0.8);
-			cursorGraphics.beginFill(state.selectedColor ? parseInt(state.selectedColor.replace('#', ''), 16) : 0xC0C0C0, 1);
-			cursorGraphics.drawRect(cursorPixelX, cursorPixelY, 1, 1);
-			cursorGraphics.endFill();
+	let cursorPixelX: number | null = null;
+	let cursorPixelY: number | null = null;
+
+	// Show cursor at mouse position if mouse cursor is being tracked
+	if (state.pointerState.mouseCursorPixel) {
+		cursorPixelX = state.pointerState.mouseCursorPixel.x;
+		cursorPixelY = state.pointerState.mouseCursorPixel.y;
+	} else if (state.touchState.activeTouches.size > 0 || state.touchState.holdTimer !== null || state.touchState.hasTouchBeenUsed) {
+		// Show cursor at center for touch controls (when touches are active, during hold, or if touch has been used)
+		cursorPixelX = Math.floor(state.camera.x);
+		cursorPixelY = Math.floor(state.camera.y);
+	}
+
+	// Only show cursor if we have valid coordinates and pixel is within world bounds
+	if (cursorPixelX !== null && cursorPixelY !== null &&
+		cursorPixelX >= 0 && cursorPixelX < WORLD_SIZE &&
+		cursorPixelY >= 0 && cursorPixelY < WORLD_SIZE) {
+
+		// Create cursor graphics if it doesn't exist
+		if (!cursorGraphics) {
+			cursorGraphics = new PIXI.Graphics();
 			state.pixelContainer.addChild(cursorGraphics);
 		}
+
+		// Show and redraw the cursor
+		cursorGraphics.visible = true;
+		cursorGraphics.clear();
+		cursorGraphics.lineStyle(2 / state.camera.scale, 0x000000, 0.8);
+		cursorGraphics.beginFill(state.selectedColor ? parseInt(state.selectedColor.replace('#', ''), 16) : 0xC0C0C0, 1);
+		cursorGraphics.drawRect(cursorPixelX, cursorPixelY, 1, 1);
+		cursorGraphics.endFill();
+	} else {
+		// Hide cursor if no valid position
+		if (cursorGraphics) {
+			cursorGraphics.visible = false;
+		}
 	}
-} 
+}
