@@ -13,7 +13,7 @@ export interface Pixel {
 	y: number;
 	color: string | null;
 	eventId: string;
-	pubkey: string;
+	pubkey: string | null;
 	timestamp: number;
 	zapEventId?: string;
 	zapAmount?: number;

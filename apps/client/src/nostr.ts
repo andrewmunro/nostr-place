@@ -99,17 +99,15 @@ class NostrService {
 	}
 
 	async publishPixel(x: number, y: number, color: string | null, isUndo: boolean = false): Promise<void> {
-		if (!this.isInitialized) {
-			throw new Error('Nostr service not initialized');
-		}
+		const isDebug = isDebugMode();
+		let publicKey: string | null = null;
 
-		// Get public key - this will trigger login UI if user isn't authenticated
-		let publicKey: string;
-		try {
-			publicKey = await window.nostr!.getPublicKey();
-			setUserInfo(publicKey);
-		} catch (error) {
-			throw new Error('Please login to place pixels');
+		if (!isDebug) {
+			try {
+				publicKey = await window.nostr!.getPublicKey();
+			} catch (error) {
+				throw new Error('Please login to place pixels');
+			}
 		}
 
 		const pixel: Pixel = {
@@ -140,6 +138,10 @@ class NostrService {
 		}
 
 		try {
+			if (!this.isInitialized) {
+				throw new Error('Nostr service not initialized');
+			}
+
 			// Use the client's publishPixelEvent method which now uses window.nostr
 			const eventId = await this.client.publishPixelEvent(pixel);
 			console.log(`Published pixel event: ${eventId}`);
