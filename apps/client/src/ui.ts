@@ -1,5 +1,6 @@
 import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
+import { formatCostBreakdown } from './pricing';
 import { state } from './state';
 
 // Color palette constants
@@ -11,6 +12,7 @@ export function setupUI() {
 	setupZoomControls();
 	setupPaletteScrollControls();
 	setupActionControls();
+	setupPreviewModeUI();
 
 	// Initial palette layout update
 	setTimeout(() => updatePaletteLayout(), 0);
@@ -19,6 +21,7 @@ export function setupUI() {
 export function updateUI() {
 	updateCoordinatesDisplay();
 	updateActionButtons();
+	updatePreviewModeUI();
 }
 
 function setupColorPalette() {
@@ -76,6 +79,130 @@ function setupActionControls() {
 	undoBtn.addEventListener('click', () => {
 		state.undoLastAction();
 	});
+}
+
+function setupPreviewModeUI() {
+	createPreviewPanel();
+	setupPreviewControls();
+}
+
+function createPreviewPanel() {
+	// Create preview panel if it doesn't exist
+	let previewPanel = document.getElementById('preview-panel');
+	if (!previewPanel) {
+		previewPanel = document.createElement('div');
+		previewPanel.id = 'preview-panel';
+		previewPanel.className = 'preview-panel hidden';
+
+		previewPanel.innerHTML = `
+			<div class="preview-header">
+				<h3>🎨 Preview Mode</h3>
+				<button id="preview-cancel" class="preview-btn cancel-btn">Cancel</button>
+			</div>
+			<div class="preview-options">
+				<label class="toggle-container">
+					<input type="checkbox" id="cost-mode-toggle">
+					<span class="toggle-slider"></span>
+					<span class="toggle-label">💰 Cost Mode</span>
+				</label>
+			</div>
+			<div class="cost-breakdown">
+				<div id="cost-summary">No pixels placed</div>
+				<div id="cost-details" class="cost-details"></div>
+			</div>
+			<div class="preview-actions">
+				<button id="preview-submit" class="preview-btn submit-btn" disabled>
+					Submit & Zap
+				</button>
+			</div>
+		`;
+
+		document.getElementById('ui-overlay')!.appendChild(previewPanel);
+	}
+}
+
+function setupPreviewControls() {
+	const submitBtn = document.getElementById('preview-submit')!;
+	const cancelBtn = document.getElementById('preview-cancel')!;
+	const costModeToggle = document.getElementById('cost-mode-toggle')! as HTMLInputElement;
+
+	submitBtn.addEventListener('click', handlePreviewSubmit);
+	cancelBtn.addEventListener('click', handlePreviewCancel);
+	costModeToggle.addEventListener('change', handleCostModeToggle);
+}
+
+function handleCostModeToggle(event: Event) {
+	const target = event.target as HTMLInputElement;
+	state.updatePreviewState({ showCostMode: target.checked });
+}
+
+function handlePreviewSubmit() {
+	if (state.previewState.pixels.size === 0) return;
+
+	// TODO: Implement batched zap submission
+	console.log('Submitting preview pixels:', state.previewState.pixels);
+	console.log('Total cost:', state.previewState.costBreakdown.totalCost);
+
+	// For now, just exit preview mode
+	handlePreviewCancel();
+}
+
+function handlePreviewCancel() {
+	state.exitPreviewMode();
+	updatePreviewModeUI();
+}
+
+function updatePreviewModeUI() {
+	const previewPanel = document.getElementById('preview-panel');
+	if (!previewPanel) return;
+
+	const costSummary = document.getElementById('cost-summary')!;
+	const costDetails = document.getElementById('cost-details')!;
+	const submitBtn = document.getElementById('preview-submit')! as HTMLButtonElement;
+	const costModeToggle = document.getElementById('cost-mode-toggle')! as HTMLInputElement;
+
+	if (state.previewState.isActive && state.previewState.pixels.size > 0) {
+		// Show preview panel
+		previewPanel.classList.remove('hidden');
+
+		// Update cost display
+		const breakdown = state.previewState.costBreakdown;
+		const totalSats = breakdown.totalCost / 1000;
+		const pixelCount = state.previewState.pixels.size;
+
+		costSummary.textContent = `${pixelCount} pixel${pixelCount > 1 ? 's' : ''} • ${totalSats} sats`;
+		costDetails.textContent = formatCostBreakdown(breakdown);
+
+		// Enable submit button
+		submitBtn.disabled = false;
+		submitBtn.textContent = `⚡ Zap ${totalSats} sats`;
+
+	} else if (state.previewState.isActive) {
+		// Show panel but with no pixels message
+		previewPanel.classList.remove('hidden');
+		costSummary.textContent = 'No pixels placed';
+		costDetails.textContent = 'Click on the canvas to place pixels • Click again to remove';
+		submitBtn.disabled = true;
+		submitBtn.textContent = 'Submit & Zap';
+
+	} else {
+		// Hide preview panel
+		previewPanel.classList.add('hidden');
+	}
+
+	// Sync cost mode toggle with state
+	if (costModeToggle) {
+		costModeToggle.checked = state.previewState.showCostMode;
+	}
+}
+
+// Add a function to periodically update the UI
+export function startUIUpdateLoop() {
+	setInterval(() => {
+		if (state.previewState.isActive) {
+			updatePreviewModeUI();
+		}
+	}, 500); // Update every 500ms when in preview mode
 }
 
 // UI update functions
@@ -186,6 +313,12 @@ function updateActionButtons() {
 	} else {
 		undoBtn.disabled = true;
 		undoBtn.title = 'No actions to undo';
+	}
+
+	// Disable undo when in preview mode
+	if (state.previewState.isActive) {
+		undoBtn.disabled = true;
+		undoBtn.title = 'Exit preview mode to undo';
 	}
 }
 

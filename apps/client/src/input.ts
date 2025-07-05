@@ -1,7 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { getCenterPixel, screenToWorld, smoothZoomToPoint } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
-import { nostrService } from './nostr';
 import { loadFromURL } from './persistence';
 import { state } from './state';
 import { updatePaletteLayout } from './ui';
@@ -94,30 +93,68 @@ function handlePinchGesture() {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-	const moveSpeed = 20 / state.camera.scale; // Move speed inversely proportional to zoom
-
-	switch (event.key.toLowerCase()) {
-		case 'w':
-		case 'arrowup':
-			state.updateCamera({ y: state.camera.y - moveSpeed });
-			break;
-		case 's':
-		case 'arrowdown':
-			state.updateCamera({ y: state.camera.y + moveSpeed });
-			break;
-		case 'a':
-		case 'arrowleft':
-			state.updateCamera({ x: state.camera.x - moveSpeed });
-			break;
-		case 'd':
-		case 'arrowright':
-			state.updateCamera({ x: state.camera.x + moveSpeed });
-			break;
-		default:
-			return; // Don't prevent default for other keys
+	// Zoom controls (zoom to center)
+	if (event.key === '=' || event.key === '+') {
+		event.preventDefault();
+		const centerX = state.app.screen.width / 2;
+		const centerY = state.app.screen.height / 2;
+		const newScale = state.camera.scale * 1.2;
+		smoothZoomToPoint(newScale, centerX, centerY);
+	} else if (event.key === '-' || event.key === '_') {
+		event.preventDefault();
+		const centerX = state.app.screen.width / 2;
+		const centerY = state.app.screen.height / 2;
+		const newScale = state.camera.scale / 1.2;
+		smoothZoomToPoint(newScale, centerX, centerY);
 	}
 
-	event.preventDefault();
+	// Camera movement (WASD or Arrow keys)
+	const moveSpeed = 50 / state.camera.scale; // Slower movement when zoomed in
+
+	if (event.key === 'w' || event.key === 'W' || event.key === 'ArrowUp') {
+		event.preventDefault();
+		state.updateCamera({
+			y: state.camera.y - moveSpeed
+		});
+	} else if (event.key === 's' || event.key === 'S' || event.key === 'ArrowDown') {
+		event.preventDefault();
+		state.updateCamera({
+			y: state.camera.y + moveSpeed
+		});
+	} else if (event.key === 'a' || event.key === 'A' || event.key === 'ArrowLeft') {
+		event.preventDefault();
+		state.updateCamera({
+			x: state.camera.x - moveSpeed
+		});
+	} else if (event.key === 'd' || event.key === 'D' || event.key === 'ArrowRight') {
+		event.preventDefault();
+		state.updateCamera({
+			x: state.camera.x + moveSpeed
+		});
+	}
+
+	// Preview mode shortcuts
+	if (state.previewState.isActive) {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			state.exitPreviewMode();
+			return;
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			if (state.previewState.pixels.size > 0) {
+				// Trigger submit (same as clicking submit button)
+				const submitBtn = document.getElementById('preview-submit') as HTMLButtonElement;
+				if (submitBtn && !submitBtn.disabled) {
+					submitBtn.click();
+				}
+			}
+			return;
+		} else if (event.key === 'Delete' || event.key === 'Backspace') {
+			event.preventDefault();
+			state.clearPreviewPixels();
+			return;
+		}
+	}
 }
 
 function startTouchHold(globalPos: { x: number; y: number }) {
@@ -132,12 +169,14 @@ function startTouchHold(globalPos: { x: number; y: number }) {
 	state.updateTouchState({
 		touchStartPos: { x: globalPos.x, y: globalPos.y },
 		holdTimer: setTimeout(() => {
-			// Place pixel at center position
+			// Place pixel at center position in preview mode
 			const centerPixel = getCenterPixel();
-			if (centerPixel.x >= 0 && centerPixel.x < WORLD_SIZE && centerPixel.y >= 0 && centerPixel.y < WORLD_SIZE) {
-				nostrService.publishPixel(centerPixel.x, centerPixel.y, state.selectedColor).catch(error => {
-					console.error('Error placing pixel:', error);
-				});
+			if (centerPixel.x >= 0 && centerPixel.x < WORLD_SIZE && centerPixel.y >= 0 && centerPixel.y < WORLD_SIZE && state.selectedColor) {
+				// Enter preview mode if not already active
+				if (!state.previewState.isActive) {
+					state.enterPreviewMode();
+				}
+				togglePreviewPixel(centerPixel.x, centerPixel.y, state.selectedColor);
 			}
 			state.updateTouchState({ holdTimer: null });
 		}, TOUCH_HOLD_DURATION)
@@ -193,15 +232,17 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 			(state.app.view as HTMLCanvasElement).style.cursor = 'default';
 		}
 	} else if (event.button === 0) { // Left click (mouse)
-		// For mouse: place pixel at cursor position
-		if (state.pointerState.mouseCursorPixel) {
+		// For mouse: place pixel at cursor position in preview mode
+		if (state.pointerState.mouseCursorPixel && state.selectedColor) {
 			const pixelX = state.pointerState.mouseCursorPixel.x;
 			const pixelY = state.pointerState.mouseCursorPixel.y;
 
 			if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
-				nostrService.publishPixel(pixelX, pixelY, state.selectedColor).catch(error => {
-					console.error('Error placing pixel:', error);
-				});
+				// Enter preview mode if not already active
+				if (!state.previewState.isActive) {
+					state.enterPreviewMode();
+				}
+				togglePreviewPixel(pixelX, pixelY, state.selectedColor);
 			}
 		}
 	} else if (event.button === 2 || event.button === 1) { // Right click or middle click - start panning
@@ -339,4 +380,22 @@ function handleWheel(event: PIXI.FederatedWheelEvent) {
 
 function handleResize() {
 	state.app.renderer.resize(window.innerWidth, window.innerHeight); // Full window height
+}
+
+function togglePreviewPixel(x: number, y: number, color: string) {
+	const pixelKey = `${x},${y}`;
+	const existingPreviewPixel = state.previewState.pixels.get(pixelKey);
+
+	if (existingPreviewPixel) {
+		// If the color is the same, remove the pixel (toggle off)
+		if (existingPreviewPixel.color === color) {
+			state.removePreviewPixel(x, y);
+		} else {
+			// If the color is different, update the pixel with the new color
+			state.addPreviewPixel(x, y, color);
+		}
+	} else {
+		// No existing preview pixel, add new one
+		state.addPreviewPixel(x, y, color);
+	}
 } 

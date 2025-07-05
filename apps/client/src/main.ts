@@ -6,7 +6,7 @@ import { loadFromURL, updateURL } from './persistence';
 import { setupRenderer, updateRenderer } from './renderer';
 import { state } from './state';
 import './style.css';
-import { setupUI, setUserInfo, updateUI } from './ui';
+import { setupUI, setUserInfo, startUIUpdateLoop, updateUI } from './ui';
 
 // Update user info when authenticated
 document.addEventListener('nlAuth', async (e) => {
@@ -35,6 +35,9 @@ async function init() {
 	loadFromURL();
 
 	state.app.ticker.add(updateLoop);
+
+	// Start the UI update loop for real-time preview updates
+	startUIUpdateLoop();
 
 	try {
 		// Check for debug mode

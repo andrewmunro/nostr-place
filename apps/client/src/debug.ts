@@ -24,7 +24,7 @@ export function initDebugMode() {
 
 	// Load dummy pixels
 	state.pixels = generateDummyPixels();
-	state.textureNeedsUpdate = true;
+	state.markAllPixelsForRedraw();
 }
 
 function generateDummyPixels(): Map<string, Pixel> {

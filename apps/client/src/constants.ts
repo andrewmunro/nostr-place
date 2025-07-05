@@ -5,6 +5,30 @@ export const MAX_SCALE = 400; // Reasonable maximum zoom
 export const DEFAULT_SCALE = 25;
 export const OPTIMSTIC_PIXELS_ENABLED = false;
 
+// Age-based pricing constants (in millisats)
+export const PRICING = {
+	NEW_PIXEL: 1000,        // 1 sat for new pixels
+	FRESH_PIXEL: 10000,     // 10 sats for pixels < 1 hour old
+	RECENT_PIXEL: 5000,     // 5 sats for pixels 1-24 hours old
+	OLDER_PIXEL: 2000,      // 2 sats for pixels 1-7 days old
+	ANCIENT_PIXEL: 1000,    // 1 sat for pixels > 1 week old
+};
+
+// Age thresholds (in hours)
+export const AGE_THRESHOLDS = {
+	FRESH: 1,      // < 1 hour
+	RECENT: 24,    // 1-24 hours
+	OLDER: 168,    // 1-7 days (168 hours)
+	ANCIENT: Infinity  // > 1 week
+};
+
+// Preview mode constants
+export const PREVIEW_MODE = {
+	MAX_PIXELS_PER_BATCH: 300,
+	PREVIEW_OPACITY: 1.0,
+	EXISTING_PIXEL_DIM: 0.3,
+};
+
 export const PRESET_COLORS = [
 	null,
 	'#FFFFFF', '#C4C4C4', '#A6A6A6', '#888888', '#6F6F6F', '#555555', '#3A3A3A', '#222222',

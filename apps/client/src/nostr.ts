@@ -62,21 +62,51 @@ class NostrService {
 	}
 
 	public handlePixelUpdate(pixel: Pixel): void {
+		// Validate and fix pixel data
+		const fixedPixel = this.validateAndFixPixel(pixel);
+
 		// Update local state
 		const pixelKey = `${pixel.x},${pixel.y}`;
-		state.pixels.set(pixelKey, pixel);
+		state.pixels.set(pixelKey, fixedPixel);
 
-		// Update canvas texture
-		if (pixel.color) {
-			state.pixelContext.fillStyle = pixel.color;
-			state.pixelContext.fillRect(pixel.x, pixel.y, 1, 1);
-		} else {
-			state.pixelContext.clearRect(pixel.x, pixel.y, 1, 1);
+		// Mark specific pixel as modified for efficient rendering
+		state.markPixelAsModified(pixel.x, pixel.y);
+
+		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${fixedPixel.color}, isValid: ${fixedPixel.isValid}`);
+	}
+
+	private validateAndFixPixel(pixel: Pixel): Pixel {
+		// Create a copy to avoid modifying the original
+		const fixedPixel = { ...pixel };
+
+		// Validate coordinates
+		if (typeof pixel.x !== 'number' || typeof pixel.y !== 'number') {
+			fixedPixel.isValid = false;
+			return fixedPixel;
 		}
 
-		state.pixelTexture.update();
+		// Validate color - accept valid hex colors or null
+		if (pixel.color === null || pixel.color === undefined || pixel.color === '') {
+			// Null color is valid (means pixel is deleted)
+			fixedPixel.color = null;
+			fixedPixel.isValid = true;
+		} else if (typeof pixel.color === 'string' && pixel.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+			// Valid hex color
+			fixedPixel.color = pixel.color;
+			fixedPixel.isValid = true;
+		} else {
+			// Invalid color
+			console.warn(`Invalid color for pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}`);
+			fixedPixel.isValid = false;
+			return fixedPixel;
+		}
 
-		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}`);
+		// Validate timestamp
+		if (typeof pixel.timestamp !== 'number' || pixel.timestamp <= 0) {
+			fixedPixel.timestamp = Date.now();
+		}
+
+		return fixedPixel;
 	}
 
 	private dimColor(color: string | null): string | null {
