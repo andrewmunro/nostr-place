@@ -21,18 +21,13 @@ class NostrService {
 			},
 			onRelayStatus: (relay) => {
 				console.log(`Relay ${relay.url}: ${relay.status}`);
-				this.updateConnectionUI();
+				setConnectionStatus(`🌐 ${this.getConnectionStatus()}`);
 			},
 			onError: (error, context) => {
 				console.error(`Nostr error in ${context}:`, error);
 				setConnectionStatus('❌ Connection error');
 			}
 		});
-	}
-
-	private updateConnectionUI() {
-		const status = this.getConnectionStatus();
-		setConnectionStatus(`🌐 ${status}`);
 	}
 
 	async initialize(): Promise<void> {
@@ -53,7 +48,6 @@ class NostrService {
 
 			this.isInitialized = true;
 			console.log('Nostr service initialized successfully');
-			this.updateConnectionUI();
 		} catch (error) {
 			console.error('Failed to initialize Nostr service:', error);
 			setConnectionStatus('❌ Connection failed');
@@ -62,56 +56,20 @@ class NostrService {
 	}
 
 	public handlePixelUpdate(pixel: Pixel): void {
-		// Validate and fix pixel data
-		const fixedPixel = this.validateAndFixPixel(pixel);
+		// TODO temp hack to remove
+		pixel.isValid = true;
 
 		// Update local state
 		const pixelKey = `${pixel.x},${pixel.y}`;
-		state.pixels.set(pixelKey, fixedPixel);
+		state.pixels.set(pixelKey, pixel);
 
 		// Mark specific pixel as modified for efficient rendering
 		state.markPixelAsModified(pixel.x, pixel.y);
 
-		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${fixedPixel.color}, isValid: ${fixedPixel.isValid}`);
+		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}, isValid: ${pixel.isValid}`);
 	}
 
-	private validateAndFixPixel(pixel: Pixel): Pixel {
-		// Create a copy to avoid modifying the original
-		const fixedPixel = { ...pixel };
-
-		// Validate coordinates
-		if (typeof pixel.x !== 'number' || typeof pixel.y !== 'number') {
-			fixedPixel.isValid = false;
-			return fixedPixel;
-		}
-
-		// Validate color - accept valid hex colors or null
-		if (pixel.color === null || pixel.color === undefined || pixel.color === '') {
-			// Null color is valid (means pixel is deleted)
-			fixedPixel.color = null;
-			fixedPixel.isValid = true;
-		} else if (typeof pixel.color === 'string' && pixel.color.match(/^#[0-9A-Fa-f]{6}$/)) {
-			// Valid hex color
-			fixedPixel.color = pixel.color;
-			fixedPixel.isValid = true;
-		} else {
-			// Invalid color
-			console.warn(`Invalid color for pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}`);
-			fixedPixel.isValid = false;
-			return fixedPixel;
-		}
-
-		// Validate timestamp
-		if (typeof pixel.timestamp !== 'number' || pixel.timestamp <= 0) {
-			fixedPixel.timestamp = Date.now();
-		}
-
-		return fixedPixel;
-	}
-
-	private dimColor(color: string | null): string | null {
-		if (!color) return null;
-
+	private dimColor(color: string): string {
 		// Convert hex color to dimmed version for pending pixels
 		if (color.startsWith('#')) {
 			const r = parseInt(color.slice(1, 3), 16);
@@ -128,7 +86,7 @@ class NostrService {
 		return color; // fallback for non-hex colors
 	}
 
-	async publishPixel(x: number, y: number, color: string | null, isUndo: boolean = false): Promise<void> {
+	async publishPixel(x: number, y: number, color: string, isUndo: boolean = false): Promise<void> {
 		const isDebug = isDebugMode();
 		let publicKey: string | null = null;
 

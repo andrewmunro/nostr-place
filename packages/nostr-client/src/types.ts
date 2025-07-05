@@ -11,7 +11,7 @@ export interface ZapEvent extends NostrEvent {
 export interface Pixel {
 	x: number;
 	y: number;
-	color: string | null;
+	color: string;
 	eventId: string;
 	pubkey: string | null;
 	timestamp: number;

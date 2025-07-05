@@ -36,8 +36,8 @@ export interface TouchState {
 export interface PixelAction {
 	x: number;
 	y: number;
-	color: string | null;
-	previousColor: string | null;
+	color: string;
+	previousColor: string;
 	timestamp: number;
 }
 
@@ -71,7 +71,7 @@ export interface PreviewState {
 
 class State {
 	// Global state
-	selectedColor: string | null = '#A06A42'; // Brown color that was selected in the original palette
+	selectedColor: string = '#A06A42'; // Brown color that was selected in the original palette
 	pixels = new Map(); // Will be populated by Nostr events
 
 	// Undo history

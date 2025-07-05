@@ -285,30 +285,6 @@ body {
 	cursor: not-allowed;
 }
 
-.color-btn.clear-color {
-	background-color: transparent;
-	background-image: linear-gradient(to bottom right,
-			#FFFFFF,
-			#FFFFFF),
-		linear-gradient(to bottom left,
-			#FFFFFF,
-			#FFFFFF);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 14px;
-	color: #ff0000;
-	font-weight: bold;
-}
-
-.color-btn.clear-color:hover {
-	border-color: #ff0000;
-}
-
-.color-btn.clear-color.selected {
-	border-color: #ff0000;
-}
-
 /* Scrollbar styling for webkit browsers */
 ::-webkit-scrollbar {
 	width: 8px;

@@ -31,10 +31,9 @@ function setupColorPalette() {
 	// Add regular colors
 	PRESET_COLORS.forEach(color => {
 		const colorButton = document.createElement('div');
-		colorButton.className = color ? 'color-btn' : 'color-btn clear-color';
-		colorButton.style.backgroundColor = color ? color : '#FFFFFF';
-		colorButton.title = color ? color : 'Clear/Delete Pixel';
-		colorButton.textContent = color ? null : '✕';
+		colorButton.className = 'color-btn';
+		colorButton.style.backgroundColor = color;
+		colorButton.title = color;
 		if (color === state.selectedColor) {
 			colorButton.classList.add('selected');
 		}
@@ -223,7 +222,7 @@ export function setUserInfo(publicKey?: string) {
 	}
 }
 
-function selectColor(color: string | null) {
+function selectColor(color: string) {
 	state.selectedColor = color;
 
 	// Update UI
