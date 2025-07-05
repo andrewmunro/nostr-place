@@ -200,6 +200,9 @@ export function startUIUpdateLoop() {
 	setInterval(() => {
 		if (state.previewState.isActive) {
 			updatePreviewModeUI();
+			updateActionButtons(); // Update undo button state in preview mode
+		} else {
+			updateActionButtons(); // Update undo button state when not in preview mode
 		}
 	}, 500); // Update every 500ms when in preview mode
 }
@@ -305,19 +308,19 @@ export function updatePaletteLayout() {
 function updateActionButtons() {
 	const undoBtn = document.getElementById('undo-btn')! as HTMLButtonElement;
 
-	// Update undo button state
-	if (state.undoHistory.length > 0) {
-		undoBtn.disabled = false;
-		undoBtn.title = `Undo (${state.undoHistory.length} actions)`;
-	} else {
-		undoBtn.disabled = true;
-		undoBtn.title = 'No actions to undo';
-	}
-
-	// Disable undo when in preview mode
 	if (state.previewState.isActive) {
+		// In preview mode: enable undo if there are preview actions to undo
+		if (state.undoHistory.length > 0) {
+			undoBtn.disabled = false;
+			undoBtn.title = `Undo preview action (${state.undoHistory.length} actions)`;
+		} else {
+			undoBtn.disabled = true;
+			undoBtn.title = 'No preview actions to undo';
+		}
+	} else {
+		// Not in preview mode: disable undo (no longer supported for published pixels)
 		undoBtn.disabled = true;
-		undoBtn.title = 'Exit preview mode to undo';
+		undoBtn.title = 'Enter preview mode to use undo';
 	}
 }
 

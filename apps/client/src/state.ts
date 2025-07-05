@@ -1,7 +1,5 @@
-import { Pixel } from '@zappy-place/nostr-client';
 import * as PIXI from 'pixi.js';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
-import { nostrService } from './nostr';
 import { calculateCostBreakdown, getPixelPrice } from './pricing';
 
 export interface CameraState {
@@ -36,8 +34,8 @@ export interface TouchState {
 export interface PixelAction {
 	x: number;
 	y: number;
-	color: string;
-	previousColor: string;
+	action: 'add' | 'remove';
+	color?: string; // Color when adding
 	timestamp: number;
 }
 
@@ -74,7 +72,7 @@ class State {
 	selectedColor: string = '#A06A42'; // Brown color that was selected in the original palette
 	pixels = new Map(); // Will be populated by Nostr events
 
-	// Undo history
+	// Undo history for preview actions
 	undoHistory: PixelAction[] = [];
 	maxUndoHistory = 50;
 
@@ -161,14 +159,8 @@ class State {
 		this.touchState = { ...this.touchState, ...updates };
 	}
 
-	addToUndoHistory(action: Pixel) {
-		this.undoHistory.push({
-			x: action.x,
-			y: action.y,
-			color: action.color,
-			timestamp: action.timestamp,
-			previousColor: this.pixels.get(`${action.x},${action.y}`)?.color || null
-		});
+	addToUndoHistory(action: PixelAction) {
+		this.undoHistory.push(action);
 
 		if (this.undoHistory.length > this.maxUndoHistory) {
 			this.undoHistory.shift();
@@ -176,10 +168,46 @@ class State {
 	}
 
 	undoLastAction() {
-		const lastAction = this.undoHistory.pop() || null;
+		if (!this.previewState.isActive) return;
+
+		const lastAction = this.undoHistory.pop();
 		if (!lastAction) return;
 
-		nostrService.publishPixel(lastAction.x, lastAction.y, lastAction.previousColor, true);
+		const pixelKey = `${lastAction.x},${lastAction.y}`;
+
+		if (lastAction.action === 'add') {
+			// Action was adding a preview pixel, so remove it
+			if (this.previewState.pixels.has(pixelKey)) {
+				// Remove without adding to undo history to avoid recursion
+				this.previewState.pixels.delete(pixelKey);
+				this.updateCostBreakdown();
+			}
+		} else if (lastAction.action === 'remove' && lastAction.color) {
+			// Action was removing a preview pixel, so add it back
+			if (!this.previewState.pixels.has(pixelKey)) {
+				// Add back without adding to undo history to avoid recursion
+				const existingPixel = this.pixels.get(pixelKey);
+				const cost = getPixelPrice(existingPixel?.timestamp || null);
+				const isNew = !existingPixel;
+				let existingPixelAge;
+
+				if (existingPixel) {
+					existingPixelAge = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
+				}
+
+				const previewPixel: PreviewPixel = {
+					x: lastAction.x,
+					y: lastAction.y,
+					color: lastAction.color,
+					isNew,
+					existingPixelAge,
+					cost
+				};
+
+				this.previewState.pixels.set(pixelKey, previewPixel);
+				this.updateCostBreakdown();
+			}
+		}
 	}
 
 	// Preview mode methods
@@ -192,6 +220,8 @@ class State {
 	}
 
 	exitPreviewMode() {
+		// Clear undo history when exiting preview mode
+		this.undoHistory = [];
 		this.updatePreviewState({
 			isActive: false,
 			pixels: new Map(),
@@ -213,6 +243,7 @@ class State {
 	addPreviewPixel(x: number, y: number, color: string) {
 		const pixelKey = `${x},${y}`;
 		const existingPixel = this.pixels.get(pixelKey);
+		const wasInPreview = this.previewState.pixels.has(pixelKey);
 
 		const cost = getPixelPrice(existingPixel?.timestamp || null);
 		const isNew = !existingPixel;
@@ -228,15 +259,33 @@ class State {
 
 		this.previewState.pixels.set(pixelKey, previewPixel);
 		this.updateCostBreakdown();
+
+		// Add to undo history only if it's a new action (not already in preview)
+		if (!wasInPreview) {
+			this.addToUndoHistory({
+				x, y, action: 'add', color, timestamp: Date.now()
+			});
+		}
 	}
 
 	removePreviewPixel(x: number, y: number) {
 		const pixelKey = `${x},${y}`;
-		this.previewState.pixels.delete(pixelKey);
-		this.updateCostBreakdown();
+		const existingPreviewPixel = this.previewState.pixels.get(pixelKey);
+
+		if (existingPreviewPixel) {
+			this.previewState.pixels.delete(pixelKey);
+			this.updateCostBreakdown();
+
+			// Store the removed pixel's color so we can restore it
+			this.addToUndoHistory({
+				x, y, action: 'remove', color: existingPreviewPixel.color, timestamp: Date.now()
+			});
+		}
 	}
 
 	clearPreviewPixels() {
+		// Clear undo history when clearing all pixels
+		this.undoHistory = [];
 		this.previewState.pixels.clear();
 		this.updateCostBreakdown();
 	}

@@ -107,10 +107,6 @@ class NostrService {
 			timestamp: Date.now(),
 		};
 
-		if (!isUndo) {
-			state.addToUndoHistory(pixel);
-		}
-
 		if (isDebugMode()) {
 			this.handlePixelUpdate(pixel);
 			return;
