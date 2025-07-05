@@ -1,13 +1,4 @@
-// Type definitions for window.nostr
-export interface NostrEvent {
-	id?: string;
-	kind: number;
-	pubkey?: string;
-	created_at: number;
-	tags: string[][];
-	content: string;
-	sig?: string;
-}
+import { NostrEvent } from "nostr-tools";
 
 export interface WindowNostr {
 	getPublicKey(): Promise<string>;
@@ -22,6 +13,11 @@ export interface WindowNostr {
 declare global {
 	interface Window {
 		nostr?: WindowNostr;
+		webln?: {
+			enable(): Promise<void>;
+			getInfo(): Promise<any>;
+			sendPayment(invoice: string): Promise<any>;
+		};
 	}
 }
 

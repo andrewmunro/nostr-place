@@ -1,0 +1,42 @@
+# Cursor Rules for Zappy Place Project
+
+## Commit Messages
+Keep commit messages short and concise.
+
+## Import Standards
+- NEVER use inline imports like `const { func } = await import('./module')`
+- Always place imports at the top of the file
+- Use static imports for all dependencies unless doing explicit code splitting
+- Group imports: external packages first, then internal modules
+
+## Code Style
+- Prefer functional approach over classes
+- Only add comments over very complicated logic
+- Use existing patterns and precedence within the project
+- Clean up redundant code after making changes
+
+## TypeScript
+- Use proper typing throughout
+- Avoid `any` type unless absolutely necessary
+- Follow existing type patterns in the codebase
+
+## Performance
+- Prefer parallel tool calls over sequential when possible
+- Use efficient data structures and algorithms
+- Avoid unnecessary re-renders and computations
+
+## File Organization
+- Keep related functionality together
+- Use clear, descriptive file names
+- Maintain consistent directory structure
+
+## Error Handling
+- Always handle errors gracefully
+- Provide meaningful error messages
+- Use proper TypeScript error types
+
+## Best Practices
+- Don't create unnecessary files
+- Prefer editing existing files over creating new ones
+- Follow the existing code patterns and conventions
+- Use proper async/await patterns, not inline imports for lazy loading 

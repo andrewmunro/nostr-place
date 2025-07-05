@@ -28,7 +28,7 @@ function updateLoop() {
 // Initialize the application
 async function init() {
 
-	console.log('Initializing Nostr Place...');
+	console.log('Initializing Zappy Place...');
 	await setupRenderer();
 	setupUI();
 	setupInput();
@@ -50,9 +50,9 @@ async function init() {
 			console.log('🌐 Connection status:', nostrService.getConnectionStatus());
 		}
 
-		console.log('✅ Nostr Place ready!');
+		console.log('✅ Zappy Place ready!');
 	} catch (error) {
-		console.error('❌ Failed to initialize Nostr Place:', error);
+		console.error('❌ Failed to initialize Zappy Place:', error);
 	}
 }
 

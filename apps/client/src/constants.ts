@@ -5,6 +5,18 @@ export const MAX_SCALE = 400; // Reasonable maximum zoom
 export const DEFAULT_SCALE = 25;
 export const OPTIMSTIC_PIXELS_ENABLED = false;
 
+// Nostr and zap configuration
+export const NOSTR_CONFIG = {
+	CANVAS_PUBKEY: 'npub12pdvt4vtsa86gwed7a4v96rdshr26m8y7em5d0q4tryqal6875dqttsgfz', // TODO: Replace with actual canvas public key
+	RELAYS: [
+		'wss://relay.damus.io',
+		'wss://nos.lol',
+		'wss://relay.nostr.band',
+		'wss://offchain.pub'
+	],
+	APP_NAME: 'zappy-place'
+};
+
 // Age-based pricing constants (in millisats)
 export const PRICING = {
 	NEW_PIXEL: 1000,        // 1 sat for new pixels

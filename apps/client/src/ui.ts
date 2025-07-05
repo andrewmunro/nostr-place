@@ -2,6 +2,7 @@ import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
 import { formatCostBreakdown } from './pricing';
 import { state } from './state';
+import { submitZapRequest } from './zap-service';
 
 // Color palette constants
 const COLORS_PER_ROW = 2;
@@ -135,15 +136,41 @@ function handleCostModeToggle(event: Event) {
 	state.updatePreviewState({ showCostMode: target.checked });
 }
 
-function handlePreviewSubmit() {
+async function handlePreviewSubmit() {
 	if (state.previewState.pixels.size === 0) return;
 
-	// TODO: Implement batched zap submission
-	console.log('Submitting preview pixels:', state.previewState.pixels);
-	console.log('Total cost:', state.previewState.costBreakdown.totalCost);
+	try {
+		// Disable submit button during processing
+		const submitBtn = document.getElementById('preview-submit')! as HTMLButtonElement;
+		submitBtn.disabled = true;
+		submitBtn.textContent = 'Processing...';
 
-	// For now, just exit preview mode
-	handlePreviewCancel();
+		// Convert preview pixels to array
+		const pixels = Array.from(state.previewState.pixels.values());
+		const totalAmountMsats = state.previewState.costBreakdown.totalCost;
+
+		// Import zap service functions and submit
+		await submitZapRequest(pixels, totalAmountMsats);
+
+		// If successful, exit preview mode
+		handlePreviewCancel();
+
+	} catch (error) {
+		console.error('Zap submission failed:', error);
+
+		// Show error to user
+		let errorMessage = 'Zap submission failed';
+		if (error instanceof Error) {
+			errorMessage += ': ' + error.message;
+		}
+		alert(errorMessage);
+
+		// Re-enable submit button
+		const submitBtn = document.getElementById('preview-submit')! as HTMLButtonElement;
+		submitBtn.disabled = false;
+		const totalSats = state.previewState.costBreakdown.totalCost / 1000;
+		submitBtn.textContent = `⚡ Zap ${totalSats} sats`;
+	}
 }
 
 function handlePreviewCancel() {

@@ -10,8 +10,10 @@
 		"deploy": "bun run build && bunx wrangler pages deploy --project-name zappy-place dist/"
 	},
 	"dependencies": {
+		"@types/pako": "^2.0.3",
 		"@zappy-place/nostr-client": "workspace:*",
 		"nostr-tools": "^2.0.0",
+		"pako": "^2.1.0",
 		"pixi.js": "^7.3.0"
 	},
 	"devDependencies": {
