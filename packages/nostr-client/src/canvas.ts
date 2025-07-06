@@ -44,7 +44,7 @@ export class NostrCanvas extends NostrClient {
 
 		while (true) {
 			const filter: Filter = {
-				kinds: [90001, 9735],
+				kinds: [9735],
 				limit: eventsPerPage,
 				until: currentUntil
 			};
@@ -89,7 +89,7 @@ export class NostrCanvas extends NostrClient {
 
 	private subscribeToRealTimeEvents(): void {
 		const filter: Filter = {
-			kinds: [90001, 9735],
+			kinds: [9735],
 			since: Math.floor(Date.now() / 1000)
 		};
 
@@ -145,16 +145,11 @@ export class NostrCanvas extends NostrClient {
 
 				// Try to pay with WebLN if available
 				if (window.webln) {
-					try {
-						await window.webln.enable();
-						const result = await window.webln.sendPayment(lnurlResponse.pr);
-						if (result.preimage) {
-							// Payment successful through WebLN
-							// The polling will detect it and show success
-						}
-					} catch (e) {
-						// WebLN payment failed, user needs to pay manually
-						console.log('WebLN payment failed, waiting for manual payment');
+					await window.webln.enable();
+					const result = await window.webln.sendPayment(lnurlResponse.pr);
+					if (result.preimage) {
+						// Payment successful through WebLN
+						// The polling will detect it and show success
 					}
 				}
 			}
@@ -205,7 +200,7 @@ export function createDefaultConfig(): NostrClientConfig {
 		pagination: {
 			eventsPerPage: 100,
 			requestDelay: 1000, // 1 second between pages
-			since: Math.floor(Date.now() / 1000) - 86400 * 1 // 1 days ago
+			since: Math.floor(Date.now() / 1000) - 86400 * 0.5 // 1 days ago
 		}
 	};
 } 

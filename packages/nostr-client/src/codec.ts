@@ -59,7 +59,7 @@ export class PixelCodec {
 			tags: [
 				['p', this.canvasPubkey],
 				['relays', ...this.relays],
-				['amount', pixelEvent.amount.toString()],
+				['amount', (pixelEvent.amount * 1000).toString()],
 				['app', 'Zappy Place'],
 				['encoding', 'gzip+base64:v1'],
 			],

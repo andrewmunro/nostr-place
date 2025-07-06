@@ -10,7 +10,7 @@ export async function fetchLightningInvoice(pixelEvent: PixelEvent, zapRequest: 
 
 		if (data.callback) {
 			const invoiceUrl = new URL(data.callback);
-			invoiceUrl.searchParams.set('amount', JSON.stringify(pixelEvent.amount * 1000)); // Convert to millisats
+			invoiceUrl.searchParams.set('amount', (pixelEvent.amount * 1000).toString()); // Convert to millisats
 			invoiceUrl.searchParams.set('nostr', JSON.stringify(zapRequest));
 
 			const invoiceResponse = await fetch(invoiceUrl.toString());
