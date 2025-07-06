@@ -1,10 +1,10 @@
-// Age-based pricing constants (in millisats)
+// Age-based pricing constants
 export const PRICING = {
-	NEW_PIXEL: 1000,        // 1 sat for new pixels
-	FRESH_PIXEL: 10000,     // 10 sats for pixels < 1 hour old
-	RECENT_PIXEL: 5000,     // 5 sats for pixels 1-24 hours old
-	OLDER_PIXEL: 2000,      // 2 sats for pixels 1-7 days old
-	ANCIENT_PIXEL: 1000,    // 1 sat for pixels > 1 week old
+	NEW_PIXEL: 1,        // 1 sat for new pixels
+	FRESH_PIXEL: 10,     // 10 sats for pixels < 1 hour old
+	RECENT_PIXEL: 5,     // 5 sats for pixels 1-24 hours old
+	OLDER_PIXEL: 2,      // 2 sats for pixels 1-7 days old
+	ANCIENT_PIXEL: 1,    // 1 sat for pixels > 1 week old
 };
 
 // Age thresholds (in hours)
@@ -64,7 +64,7 @@ export function calculateCostBreakdown(pixels: PreviewPixel[]): CostBreakdown {
 	};
 
 	for (const pixel of pixels) {
-		breakdown.totalSats += pixel.cost / 1000; // Convert msats to sats
+		breakdown.totalSats += pixel.cost;
 
 		if (pixel.isNew) {
 			breakdown.pixelCounts.new++;

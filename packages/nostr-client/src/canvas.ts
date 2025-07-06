@@ -44,7 +44,7 @@ export class NostrCanvas extends NostrClient {
 
 		while (true) {
 			const filter: Filter = {
-				kinds: [90001],
+				kinds: [90001, 9735],
 				limit: eventsPerPage,
 				until: currentUntil
 			};
@@ -89,7 +89,7 @@ export class NostrCanvas extends NostrClient {
 
 	private subscribeToRealTimeEvents(): void {
 		const filter: Filter = {
-			kinds: [90001],
+			kinds: [90001, 9735],
 			since: Math.floor(Date.now() / 1000)
 		};
 
@@ -164,12 +164,12 @@ export class NostrCanvas extends NostrClient {
 	calculateCost(pixels: Array<{ x: number; y: number; color: string }>): CostBreakdown {
 		const previewPixels: PreviewPixel[] = pixels.map(p => {
 			const existingPixel = this.pixels.get(`${p.x},${p.y}`);
-			const cost = getPixelPrice(existingPixel?.timestamp || null);
+			const cost = getPixelPrice(existingPixel?.timestamp ? existingPixel.timestamp * 1000 : null);
 			const isNew = !existingPixel;
 			let existingPixelAge: number | undefined;
 
 			if (existingPixel && existingPixel.timestamp) {
-				existingPixelAge = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
+				existingPixelAge = (Date.now() - existingPixel.timestamp * 1000) / (1000 * 60 * 60);
 			}
 
 			return {

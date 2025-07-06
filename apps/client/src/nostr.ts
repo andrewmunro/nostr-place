@@ -74,7 +74,7 @@ class NostrService {
 		}
 
 		try {
-			await this.canvas.publishPixelEvent(pixelEvent, true);
+			await this.canvas.publishPixelEvent(pixelEvent, false);
 
 			// Clear preview after successful submission
 			state.exitPreviewMode();
