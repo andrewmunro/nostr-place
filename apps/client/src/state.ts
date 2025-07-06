@@ -53,6 +53,7 @@ export interface PreviewState {
 	dragOffset: { x: number; y: number };
 	dragStartPos: { x: number; y: number } | null;
 	showCostMode: boolean; // Toggle for showing borders and age indicators
+	minimized: boolean; // Whether the preview panel is minimized
 }
 
 class State {
@@ -128,7 +129,8 @@ class State {
 		isDragging: false,
 		dragOffset: { x: 0, y: 0 },
 		dragStartPos: null,
-		showCostMode: false
+		showCostMode: false,
+		minimized: false
 	};
 
 	updateCamera(updates: Partial<CameraState>) {
@@ -210,7 +212,8 @@ class State {
 			isDragging: false,
 			dragOffset: { x: 0, y: 0 },
 			dragStartPos: null,
-			showCostMode: false
+			showCostMode: false,
+			minimized: false
 		});
 	}
 

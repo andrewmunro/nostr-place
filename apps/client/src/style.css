@@ -23,6 +23,22 @@ body {
 	background-color: var(--bg-color);
 	color: var(--text-color);
 	font-size: 13px;
+
+	/* Mobile browser optimizations */
+	-webkit-text-size-adjust: 100%;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	touch-action: none;
+
+	/* Support for safe areas on devices with notches */
+	padding-top: env(safe-area-inset-top);
+	padding-bottom: env(safe-area-inset-bottom);
+	padding-left: env(safe-area-inset-left);
+	padding-right: env(safe-area-inset-right);
 }
 
 #app {
@@ -37,11 +53,15 @@ body {
 	left: 0;
 	width: 100%;
 	height: 100%;
+	user-select: none;
+	touch-action: none;
 }
 
 #canvas-container canvas {
 	display: block;
 	cursor: crosshair;
+	user-select: none;
+	touch-action: none;
 }
 
 #ui-overlay {
@@ -304,6 +324,10 @@ body {
 	display: none;
 }
 
+.hidden {
+	display: none !important;
+}
+
 #scale {
 	color: #666;
 }
@@ -319,6 +343,17 @@ body {
 	z-index: 20;
 	pointer-events: auto;
 	overflow: visible;
+	transition: max-height 0.2s ease;
+}
+
+/* Adjust palette height when preview panel is active */
+body.preview-active #color-palette-container {
+	max-height: calc(100vh - 200px);
+}
+
+/* Adjust palette height when preview panel is minimized */
+body.preview-active.preview-minimized #color-palette-container {
+	max-height: calc(100vh - 100px);
 }
 
 #color-palette-scroll-container {
@@ -508,6 +543,47 @@ body {
 	-ms-user-select: none;
 }
 
+/* Device pixel ratio specific adjustments */
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+
+	/* High DPI devices - adjust font sizes and borders for better consistency */
+	body {
+		font-size: 14px;
+	}
+
+	.color-btn {
+		border-width: 1px;
+	}
+
+	.color-btn:hover {
+		border-width: 2px;
+	}
+
+	.color-btn.selected {
+		border-width: 3px;
+	}
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-appearance: none) {
+	body {
+		/* Fix for iOS Safari viewport height issues */
+		height: 100vh;
+		height: -webkit-fill-available;
+	}
+
+	#app {
+		height: 100vh;
+		height: -webkit-fill-available;
+	}
+
+	/* Fix for iOS Safari rubber band scrolling */
+	#canvas-container {
+		overscroll-behavior: none;
+	}
+}
+
 .footer {
 	position: fixed;
 	bottom: 0;
@@ -544,13 +620,36 @@ body {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 8px;
 }
 
 .preview-header h3 {
 	margin: 0;
 	font-size: 16px;
 	color: var(--text-color);
+}
+
+.preview-header-controls {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.minimize-btn {
+	background: #6b7280;
+	color: white;
+	padding: 8px 12px;
+	min-width: auto;
+	height: auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+	font-weight: bold;
+	line-height: 1;
+}
+
+.minimize-btn:hover {
+	background: #4b5563;
 }
 
 .preview-options {
@@ -802,8 +901,17 @@ body {
 		top: 10px;
 		left: 10px;
 		width: 84px;
-		max-height: calc(100vh - 200px);
+		max-height: calc(100vh);
 		overflow: visible;
+	}
+
+	/* Mobile palette adjustments for preview panel */
+	body.preview-active #color-palette-container {
+		max-height: calc(60vh);
+	}
+
+	body.preview-active.preview-minimized #color-palette-container {
+		max-height: calc(90vh);
 	}
 
 	#color-palette-scroll-container {
@@ -871,6 +979,15 @@ body {
 	#color-palette-container {
 		width: 78px;
 		max-height: calc(100vh - 180px);
+	}
+
+	/* Extra small mobile palette adjustments for preview panel */
+	body.preview-active #color-palette-container {
+		max-height: calc(100vh - 320px);
+	}
+
+	body.preview-active.preview-minimized #color-palette-container {
+		max-height: calc(100vh - 230px);
 	}
 
 	.color-btn {

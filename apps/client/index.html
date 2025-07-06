@@ -4,7 +4,16 @@
 <head>
 	<meta charset="UTF-8" />
 	<link rel="icon" type="image/svg+xml" href="/vite.svg" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+	<!-- Mobile viewport and optimization meta tags -->
+	<meta name="viewport"
+		content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	<meta name="format-detection" content="telephone=no" />
+	<meta name="msapplication-tap-highlight" content="no" />
+
 	<link rel="icon"
 		href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%2210 0 100 100%22><text y=%22.90em%22 font-size=%2290%22>⚡</text></svg>" />
 	<title>Zappy Place</title>
@@ -35,7 +44,10 @@
 			<div id="preview-panel" class="preview-panel hidden">
 				<div class="preview-header">
 					<h3>🎨 Preview Mode</h3>
-					<button id="preview-cancel" class="preview-btn cancel-btn">Cancel</button>
+					<div class="preview-header-controls">
+						<button id="preview-minimize" class="preview-btn minimize-btn" title="Minimize panel">−</button>
+						<button id="preview-cancel" class="preview-btn cancel-btn">Cancel</button>
+					</div>
 				</div>
 				<div class="preview-options">
 					<label class="toggle-container">

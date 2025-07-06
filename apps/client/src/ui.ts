@@ -13,9 +13,6 @@ export function setupUI() {
 	setupPreviewControls();
 	setupTutorial();
 
-	// Initial palette layout update
-	setTimeout(() => updatePaletteLayout(), 0);
-
 	// Show tutorial for first-time users
 	if (isFirstTimeUser()) {
 		showTutorial();
@@ -85,10 +82,12 @@ function setupActionControls() {
 function setupPreviewControls() {
 	const submitBtn = document.getElementById('preview-submit')!;
 	const cancelBtn = document.getElementById('preview-cancel')!;
+	const minimizeBtn = document.getElementById('preview-minimize')!;
 	const costModeToggle = document.getElementById('cost-mode-toggle')! as HTMLInputElement;
 
 	submitBtn.addEventListener('click', handlePreviewSubmit);
 	cancelBtn.addEventListener('click', handlePreviewCancel);
+	minimizeBtn.addEventListener('click', handlePreviewMinimize);
 	costModeToggle.addEventListener('change', handleCostModeToggle);
 }
 
@@ -135,6 +134,11 @@ function handlePreviewCancel() {
 	updatePreviewModeUI();
 }
 
+function handlePreviewMinimize() {
+	state.updatePreviewState({ minimized: !state.previewState.minimized });
+	updatePreviewModeUI();
+}
+
 function updatePreviewModeUI() {
 	const previewPanel = document.getElementById('preview-panel');
 	if (!previewPanel) return;
@@ -143,6 +147,21 @@ function updatePreviewModeUI() {
 	const costDetails = document.getElementById('cost-details')!;
 	const submitBtn = document.getElementById('preview-submit')! as HTMLButtonElement;
 	const costModeToggle = document.getElementById('cost-mode-toggle')! as HTMLInputElement;
+	const minimizeBtn = document.getElementById('preview-minimize')! as HTMLButtonElement;
+
+	// Update minimize button icon and title
+	if (state.previewState.minimized) {
+		minimizeBtn.textContent = '+';
+		minimizeBtn.title = 'Expand panel';
+	} else {
+		minimizeBtn.textContent = '−';
+		minimizeBtn.title = 'Minimize panel';
+	}
+
+	// Get content elements to show/hide based on minimized state
+	const previewOptions = document.querySelector('.preview-options') as HTMLElement;
+	const costBreakdown = document.querySelector('.cost-breakdown') as HTMLElement;
+	const previewActions = document.querySelector('.preview-actions') as HTMLElement;
 
 	if (state.previewState.isActive && state.previewState.pixels.size > 0) {
 		// Show preview panel
@@ -191,13 +210,39 @@ function updatePreviewModeUI() {
 		previewPanel.classList.add('hidden');
 	}
 
+	// Show/hide content based on minimized state
+	if (state.previewState.isActive && state.previewState.minimized) {
+		// Hide content when minimized
+		if (previewOptions) {
+			previewOptions.classList.add('hidden');
+		}
+		if (costBreakdown) {
+			costBreakdown.classList.add('hidden');
+		}
+		if (previewActions) {
+			previewActions.classList.add('hidden');
+		}
+	} else {
+		// Show content when not minimized
+		if (previewOptions) {
+			previewOptions.classList.remove('hidden');
+		}
+		if (costBreakdown) {
+			costBreakdown.classList.remove('hidden');
+		}
+		if (previewActions) {
+			previewActions.classList.remove('hidden');
+		}
+	}
+
 	// Sync cost mode toggle with state
 	if (costModeToggle) {
 		costModeToggle.checked = state.previewState.showCostMode;
 	}
 
-	// Update palette layout when preview mode changes
-	updatePaletteLayout();
+	// Update body class to reflect preview panel state for CSS-based layout
+	document.body.classList.toggle('preview-active', state.previewState.isActive);
+	document.body.classList.toggle('preview-minimized', state.previewState.minimized);
 }
 
 // UI update functions
@@ -237,27 +282,7 @@ function selectColor(color: string) {
 
 
 
-export function updatePaletteLayout() {
-	const container = document.getElementById('color-palette-scroll-container')!;
-	const paletteContainer = document.getElementById('color-palette-container')!;
 
-	// Calculate available height considering preview panel
-	const containerMargin = 20; // Top and bottom margins
-	const previewPanel = document.getElementById('preview-panel');
-	let previewPanelHeight = 0;
-
-	if (previewPanel && !previewPanel.classList.contains('hidden')) {
-		// If preview panel is visible, account for its height
-		const previewRect = previewPanel.getBoundingClientRect();
-		previewPanelHeight = previewRect.height + 20; // Add some margin
-	}
-
-	const availableHeight = window.innerHeight - containerMargin - previewPanelHeight;
-
-	// Set max height for container to enable scrolling when needed
-	container.style.maxHeight = `${Math.max(200, availableHeight)}px`;
-	paletteContainer.style.maxHeight = `${Math.max(240, availableHeight + 40)}px`;
-}
 
 function updateActionButtons() {
 	const undoBtn = document.getElementById('undo-btn')! as HTMLButtonElement;

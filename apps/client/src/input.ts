@@ -3,10 +3,9 @@ import { getCenterPixel, screenToWorld, smoothZoomToPoint } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
 import { loadFromURL } from './persistence';
 import { state } from './state';
-import { updatePaletteLayout } from './ui';
 
 // Touch control constants
-const TOUCH_HOLD_DURATION = 500; // milliseconds to hold for placing pixel
+const TOUCH_HOLD_DURATION = 150; // milliseconds to hold for placing pixel
 const TOUCH_MOVE_THRESHOLD = 10; // pixels to move before canceling hold
 const PINCH_THRESHOLD = 10; // minimum distance change to start pinch
 
@@ -22,9 +21,6 @@ export function setupInput() {
 
 	// Handle resize
 	window.addEventListener('resize', handleResize);
-
-	// Update palette layout on window resize
-	window.addEventListener('resize', updatePaletteLayout);
 
 	// Setup PIXI events
 	state.app.stage.on('pointerdown', handlePointerDown);
@@ -177,6 +173,7 @@ function startTouchHold(globalPos: { x: number; y: number }) {
 					state.enterPreviewMode();
 				}
 				togglePreviewPixel(centerPixel.x, centerPixel.y, state.selectedColor);
+				navigator?.vibrate(10);
 			}
 			state.updateTouchState({ holdTimer: null });
 		}, TOUCH_HOLD_DURATION)
@@ -200,6 +197,9 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 	const isTouch = event.pointerType === 'touch';
 
 	if (isTouch) {
+		// Prevent default touch behaviors that cause vibration
+		event.preventDefault();
+
 		// Mark that touch controls have been used
 		state.updateTouchState({ hasTouchBeenUsed: true });
 
@@ -259,6 +259,9 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 
 	// Update touch position if it's a touch event
 	if (event.pointerType === 'touch' && state.touchState.activeTouches.has(event.pointerId)) {
+		// Prevent default touch behaviors
+		event.preventDefault();
+
 		state.touchState.activeTouches.set(event.pointerId, { x: globalPos.x, y: globalPos.y });
 
 		// Handle pinch gesture
@@ -312,6 +315,9 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 function handlePointerUp(event: PIXI.FederatedPointerEvent) {
 	// Remove touch from tracking
 	if (event.pointerType === 'touch') {
+		// Prevent default touch behaviors
+		event.preventDefault();
+
 		state.touchState.activeTouches.delete(event.pointerId);
 
 		// Reset pinch state when no touches remain
