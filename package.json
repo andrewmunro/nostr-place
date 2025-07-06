@@ -7,13 +7,15 @@
 		"packages/*"
 	],
 	"scripts": {
-		"dev": "bun --filter=client dev",
-		"build": "bun run --filter=client build",
-		"preview": "bun --filter=client preview",
-		"deploy": "bun run --filter=client deploy"
+		"dev": "bun --filter=* dev",
+		"build": "bun run --filter=./packages/* build && bun run --filter=./apps/* build",
+		"deploy": "bun run build && bun run --filter=client deploy"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0"
 	},
-	"packageManager": "bun@1.0.0"
+	"packageManager": "bun@1.0.0",
+	"dependencies": {
+		"tsdown": "^0.12.9"
+	}
 }

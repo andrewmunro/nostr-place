@@ -5,8 +5,8 @@
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {
-		"build": "tsc",
-		"dev": "tsc --watch"
+		"build": "bun run tsdown src/index.ts --report=false --format cjs,esm",
+		"dev": "bun run build --watch"
 	},
 	"dependencies": {
 		"nostr-tools": "^2.0.0",
