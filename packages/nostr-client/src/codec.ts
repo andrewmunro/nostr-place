@@ -1,4 +1,6 @@
+import { NostrEvent } from 'nostr-tools';
 import * as pako from 'pako';
+import { PixelEvent } from './types';
 
 export interface PixelData {
 	x: number;
@@ -42,4 +44,37 @@ export function decodePixels(base64: string): PixelData[] {
 		console.error('Failed to decode pixels:', error);
 		return [];
 	}
-} 
+}
+
+export class PixelCodec {
+	constructor(private canvasPubkey: string, private relays: string[]) { }
+
+	encodePixelEvent(pixelEvent: PixelEvent, debug = false): NostrEvent {
+		const encodedContent = encodePixels(pixelEvent.pixels);
+
+		return {
+			kind: debug ? 90001 : 9734,
+			created_at: Math.floor(Date.now() / 1000),
+			content: encodedContent,
+			tags: [
+				['p', this.canvasPubkey],
+				['relays', ...this.relays],
+				['amount', pixelEvent.amount.toString()],
+				['app', 'Zappy Place'],
+				['encoding', 'gzip+base64:v1'],
+			],
+			pubkey: '',
+			id: '',
+			sig: ''
+		};
+	}
+
+	decodePixelEvent(event: NostrEvent): PixelEvent {
+		return {
+			pixels: decodePixels(event.content),
+			timestamp: event.created_at,
+			senderPubkey: event.pubkey,
+			amount: parseInt(event.tags.find(t => t[0] === 'amount')?.[1] || '0', 10)
+		};
+	}
+}

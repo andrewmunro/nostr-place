@@ -23,6 +23,10 @@ Keep commit messages short and concise.
 
 ## Import Standards
 - NEVER use inline imports like `const { func } = await import('./module')`
+- NEVER use '.js' extensions for imports.
+- NEVER use 'import * as' for imports.
+- ALWAYS use 'import { }' for imports.
+- ALWAYS use 'export * from' for exports.
 - Always place imports at the top of the file
 - Use static imports for all dependencies unless doing explicit code splitting
 - Group imports: external packages first, then internal modules

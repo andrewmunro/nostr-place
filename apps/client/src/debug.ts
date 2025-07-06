@@ -23,8 +23,7 @@ export function initDebugMode() {
 	}
 
 	// Load dummy pixels
-	state.pixels = generateDummyPixels();
-	state.markAllPixelsForRedraw();
+	state.setPixels(generateDummyPixels());
 }
 
 function generateDummyPixels(): Map<string, Pixel> {

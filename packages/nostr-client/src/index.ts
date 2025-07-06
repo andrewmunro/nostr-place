@@ -1,4 +1,5 @@
-export * from './client.js';
-export * from './types.js';
-export * from './validator.js';
+// Main interface
+export { NostrCanvas } from './canvas';
+export { decodePixels, encodePixels } from './codec';
+export * from './types';
 

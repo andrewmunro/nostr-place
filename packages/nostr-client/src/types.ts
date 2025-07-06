@@ -1,22 +1,16 @@
 import { NostrEvent } from "nostr-tools";
 
-export interface PixelEvent extends NostrEvent {
-	kind: 90001;
-}
-
-export interface ZapEvent extends NostrEvent {
-	kind: 9735;
-}
-
-export interface Pixel {
+export interface PixelData {
 	x: number;
 	y: number;
 	color: string;
-	eventId: string;
-	pubkey: string | null;
-	timestamp: number;
-	zapEventId?: string;
-	zapAmount?: number;
+}
+
+export interface PixelEvent {
+	pixels: PixelData[];
+	amount: number;
+	senderPubkey?: string;
+	timestamp?: number;
 	isValid?: boolean;
 }
 
@@ -26,10 +20,8 @@ export interface ValidationResult {
 }
 
 export interface CanvasConfig {
-	minZapAmount: number; // in millisats
-	zapTimeWindow: number; // in seconds
-	maxPixelAge: number; // in seconds
-	canvasSize: number; // canvas dimensions (width/height)
+	pubkey: string;
+	lnurl: string;
 }
 
 // Relay connection types
@@ -42,7 +34,6 @@ export interface RelayConnection {
 
 export interface NostrClientConfig {
 	relays: string[];
-	canvasConfig: CanvasConfig;
 	reconnectInterval: number; // milliseconds
 	maxReconnectAttempts: number;
 	pagination: {
@@ -54,16 +45,40 @@ export interface NostrClientConfig {
 
 // Event callback types
 export interface CanvasEventCallbacks {
-	onPixelUpdate?: (pixel: Pixel) => void;
+	onPixelEvent?: (pixel: PixelEvent) => void;
 	onRelayStatus?: (relay: RelayConnection) => void;
-	onEventReceived?: (event: NostrEvent) => void;
 	onError?: (error: Error, context?: string) => void;
 }
 
 export interface NostrClientState {
 	isConnected: boolean;
 	connectedRelays: string[];
-	pixels: Map<string, Pixel>;
-	pixelEvents: Map<string, PixelEvent>;
-	zapEvents: Map<string, ZapEvent>;
-} 
+	pixels: Map<string, PixelEvent>;
+	// zapEvents: Map<string, ZapEvent>;
+}
+
+export interface CostBreakdown {
+	totalSats: number;
+	pixelCounts: {
+		new: number;
+		fresh: number;
+		recent: number;
+		older: number;
+		ancient: number;
+	};
+}
+
+// Browser extension type declarations
+declare global {
+	interface Window {
+		webln?: {
+			enable(): Promise<void>;
+			makeInvoice(args: { amount: number; defaultMemo?: string }): Promise<{ paymentRequest: string }>;
+			sendPayment(paymentRequest: string): Promise<{ preimage: string }>;
+		};
+		nostr?: {
+			getPublicKey(): Promise<string>;
+			signEvent(event: NostrEvent): Promise<NostrEvent>;
+		};
+	}
+}

@@ -3,36 +3,6 @@ export const WORLD_SIZE = 2000; // 2000x2000 pixel world
 export const MIN_SCALE = 0.5; // Prevent zooming out too far
 export const MAX_SCALE = 400; // Reasonable maximum zoom
 export const DEFAULT_SCALE = 25;
-export const OPTIMSTIC_PIXELS_ENABLED = false;
-
-// Nostr and zap configuration
-export const NOSTR_CONFIG = {
-	CANVAS_PUBKEY: '5593f822e76264a538fc85aad0c8e372b9b85969c048e89e4993fd36dcfc16d9', // TODO: Replace with actual canvas public key
-	RELAYS: [
-		'wss://relay.damus.io',
-		'wss://nos.lol',
-		'wss://relay.nostr.band',
-		'wss://offchain.pub'
-	],
-	APP_NAME: 'Zappy Place'
-};
-
-// Age-based pricing constants (in millisats)
-export const PRICING = {
-	NEW_PIXEL: 1000,        // 1 sat for new pixels
-	FRESH_PIXEL: 10000,     // 10 sats for pixels < 1 hour old
-	RECENT_PIXEL: 5000,     // 5 sats for pixels 1-24 hours old
-	OLDER_PIXEL: 2000,      // 2 sats for pixels 1-7 days old
-	ANCIENT_PIXEL: 1000,    // 1 sat for pixels > 1 week old
-};
-
-// Age thresholds (in hours)
-export const AGE_THRESHOLDS = {
-	FRESH: 1,      // < 1 hour
-	RECENT: 24,    // 1-24 hours
-	OLDER: 168,    // 1-7 days (168 hours)
-	ANCIENT: Infinity  // > 1 week
-};
 
 // Preview mode constants
 export const PREVIEW_MODE = {

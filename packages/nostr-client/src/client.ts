@@ -1,77 +1,22 @@
-import { Filter } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
-import { finalizeEvent, generateSecretKey, getPublicKey, NostrEvent } from 'nostr-tools/pure';
-import { bytesToHex, hexToBytes } from 'nostr-tools/utils';
 import {
-	CanvasEventCallbacks,
 	NostrClientConfig,
-	NostrClientState,
-	Pixel,
-	PixelEvent,
-	RelayConnection,
-	ZapEvent
-} from './types.js';
-import { PixelValidator } from './validator.js';
+	RelayConnection
+} from './types';
 
-// Window.nostr type definitions
-// interface WindowNostr {
-// 	getPublicKey(): Promise<string>;
-// 	signEvent(event: any): Promise<any>;
-// }
-
-// declare global {
-// 	interface Window {
-// 		nostr?: WindowNostr;
-// 	}
-// }
-
-export class NostrClient {
-	private pool: SimplePool;
-	private relays: Map<string, RelayConnection>;
-	private state: NostrClientState;
-	private config: NostrClientConfig;
-	private callbacks: CanvasEventCallbacks;
-	private validator: PixelValidator;
+export abstract class NostrClient {
+	protected pool: SimplePool;
+	protected relays: Map<string, RelayConnection>;
+	protected config: NostrClientConfig;
 	private reconnectTimers: Map<string, NodeJS.Timeout>;
-	private privateKey?: string;
-	private publicKey?: string;
-	private isRealTimeSubscriptionActive: boolean = false;
 
-	constructor(config: NostrClientConfig, callbacks: CanvasEventCallbacks = {}) {
+	constructor(config: NostrClientConfig) {
 		this.config = config;
-		this.callbacks = callbacks;
 		this.pool = new SimplePool();
 		this.relays = new Map();
 		this.reconnectTimers = new Map();
-		this.validator = new PixelValidator(config.canvasConfig);
-
-		this.state = {
-			isConnected: false,
-			connectedRelays: [],
-			pixels: new Map(),
-			pixelEvents: new Map(),
-			zapEvents: new Map()
-		};
 
 		this.initializeRelays();
-	}
-
-	// Key management
-	generateKeys(): { privateKey: string; publicKey: string } {
-		const secretKey = generateSecretKey();
-		this.privateKey = bytesToHex(secretKey);
-		this.publicKey = getPublicKey(secretKey);
-		return { privateKey: this.privateKey, publicKey: this.publicKey };
-	}
-
-	setKeys(privateKey: string): void {
-		this.privateKey = privateKey;
-		const secretKeyBytes = hexToBytes(privateKey);
-		this.publicKey = getPublicKey(secretKeyBytes);
-	}
-
-	getPublicKey(): string | undefined {
-		return this.publicKey;
 	}
 
 	// Connection management
@@ -91,7 +36,19 @@ export class NostrClient {
 		);
 
 		await Promise.allSettled(connectionPromises);
-		this.updateConnectionState();
+	}
+
+	abstract onRelayStatus(relay: RelayConnection): void;
+	abstract onError(error: Error, context: string): void;
+
+	get isConnected(): boolean {
+		return [...this.relays.values()].some(relay => relay.status === 'connected');
+	}
+
+	get connectedRelays(): string[] {
+		return Array.from(this.relays.values())
+			.filter(relay => relay.status === 'connected')
+			.map(relay => relay.url);
 	}
 
 	private async connectToRelay(url: string): Promise<void> {
@@ -100,7 +57,7 @@ export class NostrClient {
 
 		try {
 			relay.status = 'connecting';
-			this.callbacks.onRelayStatus?.(relay);
+			this.onRelayStatus?.(relay);
 
 			// Test connection by attempting to connect
 			const connection = await this.pool.ensureRelay(url);
@@ -116,19 +73,19 @@ export class NostrClient {
 			relay.lastConnected = Date.now();
 			relay.errorCount = 0;
 
-			this.callbacks.onRelayStatus?.(relay);
-			this.updateConnectionState();
+			this.onRelayStatus?.(relay);
 
 			// Re-establish real-time subscription if it was active
-			if (this.isRealTimeSubscriptionActive) {
-				this.subscribeToRealTimeEvents();
-			}
+			// TODO check if needed
+			// if (this.isRealTimeSubscriptionActive) {
+			// 	this.subscribeToRealTimeEvents();
+			// }
 		} catch (error) {
 			relay.status = 'error';
 			relay.errorCount++;
 
-			this.callbacks.onRelayStatus?.(relay);
-			this.callbacks.onError?.(error as Error, `Connecting to relay ${url}`);
+			this.onRelayStatus?.(relay);
+			this.onError?.(error as Error, `Connecting to relay ${url}`);
 
 			this.scheduleReconnect(url);
 		}
@@ -158,273 +115,22 @@ export class NostrClient {
 		this.reconnectTimers.set(url, timer);
 	}
 
-	private updateConnectionState(): void {
-		const connected = Array.from(this.relays.values())
-			.filter(relay => relay.status === 'connected')
-			.map(relay => relay.url);
-
-		this.state.connectedRelays = connected;
-		this.state.isConnected = connected.length > 0;
-	}
-
-	async fetchHistoricalEvents(until: number = Math.floor(Date.now() / 1000)): Promise<void> {
-		if (this.state.connectedRelays.length === 0) {
-			throw new Error('No connected relays');
-		}
-
-		let currentUntil = until;
-		let pagesFetched = 0;
-		const { since, eventsPerPage, requestDelay } = this.config.pagination;
-
-		while (true) {
-			const filter: Filter = {
-				kinds: [90001],
-				limit: eventsPerPage,
-				until: currentUntil
-			};
-
-			let pageEvents = 0;
-			let oldestInPage: number | undefined;
-			let resolveFn!: () => void;
-
-			await new Promise<void>((resolve) => {
-				resolveFn = resolve;
-
-				this.pool.subscribe(this.state.connectedRelays, filter, {
-					onevent: (event: NostrEvent) => {
-						if (event.created_at <= since) return;
-
-						pageEvents++;
-						this.handleEvent(event);
-
-						if (!oldestInPage || event.created_at < oldestInPage) {
-							oldestInPage = event.created_at;
-						}
-					},
-					oneose: () => {
-						resolveFn();
-					}
-				});
-			});
-
-			pagesFetched++;
-
-			const noProgress = !oldestInPage || oldestInPage >= currentUntil;
-			const reachedSince = oldestInPage && oldestInPage <= since;
-
-			if (pageEvents === 0 || reachedSince || noProgress) {
-				break;
-			}
-
-			currentUntil = oldestInPage;
-			await new Promise((res) => setTimeout(res, requestDelay));
-		}
-	}
-
-	// Event subscription
-	async subscribeToCanvas(): Promise<void> {
-		this.isRealTimeSubscriptionActive = true;
-		this.subscribeToRealTimeEvents();
-	}
-
-	private subscribeToRealTimeEvents(): void {
-		const filter: Filter = {
-			kinds: [90001],
-			since: Math.floor(Date.now() / 1000)
-		};
-
-		this.pool.subscribe(this.state.connectedRelays, filter, {
-			onevent: (event: NostrEvent) => {
-				this.handleEvent(event);
-			},
-			onclose: () => {
-				console.log('Real-time subscription ended, restarting...');
-				this.subscribeToRealTimeEvents();
-			},
-		});
-	}
-
-	// Event handling
-	private handleEvent(event: NostrEvent): void {
-		try {
-			this.callbacks.onEventReceived?.(event);
-
-			if (event.kind === 90001) {
-				this.handlePixelEvent(event as PixelEvent);
-			} else if (event.kind === 9735) {
-				this.handleZapEvent(event as ZapEvent);
-			}
-		} catch (error) {
-			this.callbacks.onError?.(error as Error, `Processing event ${event.id}`);
-		}
-	}
-
-	private handlePixelEvent(pixelEvent: PixelEvent): void {
-		// Store the pixel event
-		this.state.pixelEvents.set(pixelEvent.id, pixelEvent);
-
-		// Check if we already have a zap for this pixel
-		const zapEvent = this.findZapForPixel(pixelEvent.id);
-
-		// Extract pixel data and validate
-		const pixel = this.validator.extractPixelFromEvent(pixelEvent, zapEvent);
-
-		// Update canvas state
-		const pixelKey = `${pixel.x},${pixel.y}`;
-		const existingPixel = this.state.pixels.get(pixelKey);
-
-		const shouldUpdate = !existingPixel ||
-			(pixel.isValid && !existingPixel.isValid) ||
-			(pixel.isValid === existingPixel.isValid && pixel.timestamp > existingPixel.timestamp)
-
-		// Only update if this pixel is newer or more valid
-		if (shouldUpdate) {
-			this.state.pixels.set(pixelKey, pixel);
-			this.callbacks.onPixelUpdate?.(pixel);
-		}
-	}
-
-	private handleZapEvent(zapEvent: ZapEvent): void {
-		// Store the zap event
-		this.state.zapEvents.set(zapEvent.id, zapEvent);
-
-		// Find the referenced pixel event
-		const eTag = zapEvent.tags.find(tag => tag[0] === 'e');
-		if (!eTag) return;
-
-		const pixelEventId = eTag[1];
-		const pixelEvent = this.state.pixelEvents.get(pixelEventId);
-
-		if (pixelEvent) {
-			// Re-validate the pixel with the new zap
-			const pixel = this.validator.extractPixelFromEvent(pixelEvent, zapEvent);
-
-			const pixelKey = `${pixel.x},${pixel.y}`;
-			const existingPixel = this.state.pixels.get(pixelKey);
-
-			// Update if this makes the pixel valid or if it's newer
-			if (!existingPixel ||
-				(pixel.isValid && !existingPixel.isValid) ||
-				(pixel.isValid === existingPixel.isValid && pixel.timestamp > existingPixel.timestamp)) {
-
-				this.state.pixels.set(pixelKey, pixel);
-				this.callbacks.onPixelUpdate?.(pixel);
-			}
-		}
-	}
-
-	private findZapForPixel(pixelEventId: string): ZapEvent | undefined {
-		for (const zapEvent of this.state.zapEvents.values()) {
-			const eTag = zapEvent.tags.find(tag => tag[0] === 'e');
-			if (eTag && eTag[1] === pixelEventId) {
-				return zapEvent;
-			}
-		}
-		return undefined;
-	}
-
-	// Event publishing
-	async publishPixelEvent(pixel: Pixel): Promise<string> {
-		if (this.state.connectedRelays.length === 0) {
-			throw new Error('No connected relays');
-		}
-
-		const event = {
-			kind: 90001,
-			created_at: Math.floor(Date.now() / 1000),
-			tags: [
-				['x', pixel.x.toString()],
-				['y', pixel.y.toString()],
-			],
-			content: `https://zappy-place.pages.dev/#x=${pixel.x}&y=${pixel.y}&scale=25.00`
-		};
-
-		if (pixel.color) {
-			event.tags.push(['color', pixel.color]);
-		}
-
-		let signedEvent;
-
-		// Try to use window.nostr if available (for nostr-login integration)
-		if (typeof globalThis !== 'undefined' && 'window' in globalThis && (globalThis as any).window?.nostr) {
-			try {
-				signedEvent = await (globalThis as any).window.nostr.signEvent(event);
-			} catch (error) {
-				throw new Error('Failed to sign event with window.nostr');
-			}
-		} else if (this.privateKey) {
-			// Fallback to private key signing
-			const privateKeyBytes = hexToBytes(this.privateKey);
-			signedEvent = finalizeEvent(event, privateKeyBytes);
-		} else {
-			throw new Error('No signing method available. Please login or set private key.');
-		}
-
-		const publishPromises = this.state.connectedRelays.map(relayUrl =>
-			this.pool.publish([relayUrl], signedEvent)
-		);
-
-		await Promise.allSettled(publishPromises);
-		return signedEvent.id;
-	}
-
-	// State getters
-	getPixels(): Map<string, Pixel> {
-		return new Map(this.state.pixels);
-	}
-
 	getRelayStatuses(): RelayConnection[] {
 		return Array.from(this.relays.values());
 	}
 
 	// Cleanup
 	async disconnect(): Promise<void> {
-		// Mark real-time subscription as inactive
-		this.isRealTimeSubscriptionActive = false;
-
 		// Clear reconnect timers
 		this.reconnectTimers.forEach(timer => clearTimeout(timer));
 		this.reconnectTimers.clear();
 
 		// Close pool
-		this.pool.close(this.state.connectedRelays);
+		this.pool.close(Array.from(this.relays.keys()));
 
 		// Update state
-		this.state.isConnected = false;
-		this.state.connectedRelays = [];
 		this.relays.forEach(relay => {
 			relay.status = 'disconnected';
 		});
 	}
-
-	// Stop real-time subscription
-	stopRealTimeSubscription(): void {
-		this.isRealTimeSubscriptionActive = false;
-	}
 }
-
-// Default configuration factory
-export function createDefaultConfig(): NostrClientConfig {
-	return {
-		relays: [
-			// 'wss://relay.damus.io', // Rate limited
-			'wss://relay.nostr.band',
-			'wss://relay.primal.net',
-			// 'wss://nos.lol',
-			// 'wss://relay.getalby.com/v1'
-		],
-		canvasConfig: {
-			minZapAmount: 1000, // 1 sat in millisats
-			zapTimeWindow: 300, // 5 minutes
-			maxPixelAge: 86400, // 24 hours
-			canvasSize: 2000
-		},
-		reconnectInterval: 5000,
-		maxReconnectAttempts: 5,
-		pagination: {
-			eventsPerPage: 500,
-			requestDelay: 0,
-			since: 1751410800
-		}
-	};
-} 
