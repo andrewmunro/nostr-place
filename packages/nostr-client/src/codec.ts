@@ -81,7 +81,7 @@ export class PixelCodec {
 			pixels: decodePixels(event.content),
 			timestamp: event.created_at,
 			senderPubkey: event.pubkey,
-			amount: parseInt(event.tags.find(t => t[0] === 'amount')?.[1] || '0', 10),
+			amount: parseInt(event.tags.find(t => t[0] === 'amount')?.[1] || '0', 10) / 1000,
 			message: messageTag?.[1],
 			url: urlTag?.[1]
 		};

@@ -39,9 +39,18 @@ export interface NostrClientConfig {
 	};
 }
 
+// Validation error types
+export interface ValidationError {
+	type: 'INVALID_COORDINATES' | 'INVALID_COLOR' | 'INVALID_AMOUNT' | 'TOO_MANY_PIXELS' | 'INVALID_TIMESTAMP';
+	message: string;
+	pixelIndex?: number;
+	pixel?: PixelData;
+}
+
 // Event callback types
 export interface CanvasEventCallbacks {
 	onPixelEvent?: (pixel: PixelEvent) => void;
+	onValidationError?: (event: PixelEvent, errors: ValidationError[]) => void;
 	onRelayStatus?: (relay: RelayConnection) => void;
 	onError?: (error: Error, context?: string) => void;
 }

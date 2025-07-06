@@ -5,11 +5,15 @@ import { LIGHTNING_CONFIG } from './constants';
 import { fetchLightningInvoice } from './lightning';
 import { calculateCostBreakdown, getPixelPrice, PreviewPixel } from './pricing';
 import { CanvasEventCallbacks, CostBreakdown, NostrClientConfig, PixelEvent, RelayConnection } from './types';
+import { validatePixelEvent, validatePixelEventOptimistic } from './validation';
 
 export class NostrCanvas extends NostrClient {
 	private callbacks: CanvasEventCallbacks;
 	private codec: PixelCodec;
 	private pixels: Map<string, PixelEvent> = new Map();
+	private processedEventIds: Set<string> = new Set(); // Track processed event IDs
+	private readonly MAX_PROCESSED_EVENTS = 10000; // Limit memory usage
+	private cleanupInterval: NodeJS.Timeout | null = null; // Store interval ID for cleanup
 
 	constructor(config: Partial<NostrClientConfig> = {}, callbacks: CanvasEventCallbacks) {
 		const fullConfig = { ...createDefaultConfig(), ...config };
@@ -17,6 +21,9 @@ export class NostrCanvas extends NostrClient {
 
 		this.callbacks = callbacks;
 		this.codec = new PixelCodec(LIGHTNING_CONFIG.PUBKEY, this.config.relays);
+
+		// Clean up old event IDs periodically to prevent memory leaks
+		this.cleanupInterval = setInterval(() => this.cleanupProcessedEvents(), 300000); // Every 5 minutes
 	}
 
 	async initialize(): Promise<void> {
@@ -41,7 +48,9 @@ export class NostrCanvas extends NostrClient {
 		let currentUntil = until;
 		let pagesFetched = 0;
 		const { since, eventsPerPage, requestDelay } = this.config.pagination;
+		const allEvents: NostrEvent[] = []; // Collect all events first
 
+		// Collect all historical events
 		while (true) {
 			const filter: Filter = {
 				kinds: [90001, 9735],
@@ -62,10 +71,10 @@ export class NostrCanvas extends NostrClient {
 						if (event.created_at <= since) return;
 
 						pageEvents++;
-						this.handlePixelEvent(event);
+						allEvents.push(event); // Collect instead of processing immediately
 
 						if (!oldestInPage || event.created_at < oldestInPage) {
-							oldestInPage = event.created_at;
+							oldestInPage = event.created_at - 1;
 						}
 					},
 					oneose: () => {
@@ -76,23 +85,36 @@ export class NostrCanvas extends NostrClient {
 
 			pagesFetched++;
 
+			const lessThanLimit = pageEvents < eventsPerPage;
 			const noProgress = !oldestInPage || oldestInPage >= currentUntil;
 			const reachedSince = oldestInPage && oldestInPage <= since;
 
-			if (pageEvents === 0 || reachedSince || noProgress) {
+			if (pageEvents === 0 || lessThanLimit || reachedSince || noProgress) {
 				break;
 			}
 
 			currentUntil = oldestInPage;
 			await new Promise((res) => setTimeout(res, requestDelay));
 		}
+
+		// Sort events by timestamp (oldest first) for proper chronological processing
+		allEvents.sort((a, b) => a.created_at - b.created_at);
+
+		console.log(`Processing ${allEvents.length} historical events in chronological order...`);
+
+		// Process events in chronological order (oldest to newest)
+		for (const event of allEvents) {
+			this.handlePixelEvent(event);
+		}
+
+		console.log(`Finished processing ${allEvents.length} historical events`);
 	}
 
 	private subscribeToRealTimeEvents(): void {
 		const filter: Filter = {
 			kinds: [90001, 9735],
 			'#p': [LIGHTNING_CONFIG.PUBKEY],
-			since: Math.floor(Date.now() / 1000) - (3600 * 2)
+			since: Math.floor(Date.now() / 1000)
 		};
 
 		this.pool.subscribe(this.connectedRelays, filter, {
@@ -114,13 +136,30 @@ export class NostrCanvas extends NostrClient {
 			event = description;
 		}
 
+		// Deduplicate events by ID
+		if (this.processedEventIds.has(event.id)) {
+			return; // Skip already processed events
+		}
+
 		if (!event.tags.some(t => t[0] === 'app' && t[1] === 'Zappy Place')) return;
 
 		const pixelEvent = this.codec.decodePixelEvent(event);
 
-		// TODO validate pixel against business rules
-		// validatePixelEvent(pixelEvent);
+		// Validate pixel event against business rules
+		const validationResult = validatePixelEventOptimistic(pixelEvent, (x, y) => this.getPixelEvent(x, y));
 
+		if (!validationResult.isValid) {
+			console.warn('Invalid pixel event received:', validationResult.errors);
+			if (this.callbacks.onValidationError) {
+				this.callbacks.onValidationError(pixelEvent, validationResult.errors);
+			}
+			return;
+		}
+
+		// Mark event as processed
+		this.processedEventIds.add(event.id);
+
+		// Store pixels from the event
 		for (const pixel of pixelEvent.pixels) {
 			const pixelKey = `${pixel.x},${pixel.y}`;
 			this.pixels.set(pixelKey, pixelEvent);
@@ -133,6 +172,14 @@ export class NostrCanvas extends NostrClient {
 	async publishPixelEvent(pixelEvent: PixelEvent, debug = false) {
 		if (!this.isConnected) {
 			throw new Error('No connected relays');
+		}
+
+		// Validate the pixel event before publishing
+		const validationResult = validatePixelEvent(pixelEvent, (x, y) => this.getPixelEvent(x, y));
+
+		if (!validationResult.isValid) {
+			const errorMessage = `Cannot publish invalid pixel event: ${validationResult.errors.map(e => e.message).join(', ')}`;
+			throw new Error(errorMessage);
 		}
 
 		const encodedEvent = this.codec.encodePixelEvent(pixelEvent, debug);
@@ -193,7 +240,29 @@ export class NostrCanvas extends NostrClient {
 	}
 
 	async disconnect(): Promise<void> {
-		await this.disconnect();
+		// Clean up the interval timer
+		if (this.cleanupInterval) {
+			clearInterval(this.cleanupInterval);
+			this.cleanupInterval = null;
+		}
+
+		await super.disconnect();
+	}
+
+	private cleanupProcessedEvents(): void {
+		// If we have too many processed event IDs, clear some old ones
+		if (this.processedEventIds.size > this.MAX_PROCESSED_EVENTS) {
+			console.log(`Cleaning up processed event IDs (${this.processedEventIds.size} -> ${this.MAX_PROCESSED_EVENTS / 2})`);
+
+			// Convert to array, keep only the most recent half
+			const eventIds = Array.from(this.processedEventIds);
+			this.processedEventIds.clear();
+
+			// Keep the second half (more recent events)
+			const keepCount = Math.floor(this.MAX_PROCESSED_EVENTS / 2);
+			const recentEvents = eventIds.slice(-keepCount);
+			recentEvents.forEach(id => this.processedEventIds.add(id));
+		}
 	}
 }
 
