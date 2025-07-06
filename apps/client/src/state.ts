@@ -71,8 +71,7 @@ class State {
 	gridContainer!: PIXI.Container;
 	cursorContainer!: PIXI.Container;
 
-	// Color palette scroll state
-	paletteScrollOffset = 0;
+
 
 	// Texture-based rendering for performance
 	pixelTexture!: PIXI.Texture;

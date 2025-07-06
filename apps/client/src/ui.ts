@@ -5,14 +5,12 @@ import { state } from './state';
 
 // Color palette constants
 const COLORS_PER_ROW = 2;
-const SCROLL_STEP = 2; // Reduced scroll step for smoother navigation
 
 export function setupUI() {
 	setupColorPalette();
 	setupZoomControls();
-	setupPaletteScrollControls();
 	setupActionControls();
-	setupPreviewModeUI();
+	setupPreviewControls();
 	setupTutorial();
 
 	// Initial palette layout update
@@ -34,22 +32,31 @@ function setupColorPalette() {
 	const colorPalette = document.getElementById('color-palette')!;
 	colorPalette.innerHTML = '';
 
-	// Add regular colors
-	PRESET_COLORS.forEach(color => {
-		const colorButton = document.createElement('div');
-		colorButton.className = 'color-btn';
-		colorButton.style.backgroundColor = color;
-		colorButton.title = color;
-		if (color === state.selectedColor) {
-			colorButton.classList.add('selected');
+	// Group colors into rows of 2
+	for (let i = 0; i < PRESET_COLORS.length; i += COLORS_PER_ROW) {
+		const colorRow = document.createElement('div');
+		colorRow.className = 'color-row';
+
+		// Add colors to this row
+		for (let j = 0; j < COLORS_PER_ROW && i + j < PRESET_COLORS.length; j++) {
+			const color = PRESET_COLORS[i + j];
+			const colorButton = document.createElement('div');
+			colorButton.className = 'color-btn';
+			colorButton.style.backgroundColor = color;
+			colorButton.title = color;
+			if (color === state.selectedColor) {
+				colorButton.classList.add('selected');
+			}
+
+			colorButton.addEventListener('click', () => {
+				selectColor(color);
+			});
+
+			colorRow.appendChild(colorButton);
 		}
 
-		colorButton.addEventListener('click', () => {
-			selectColor(color);
-		});
-
-		colorPalette.appendChild(colorButton);
-	});
+		colorPalette.appendChild(colorRow);
+	}
 }
 
 function setupZoomControls() {
@@ -65,18 +72,7 @@ function setupZoomControls() {
 	});
 }
 
-function setupPaletteScrollControls() {
-	const scrollUpBtn = document.getElementById('palette-scroll-up')!;
-	const scrollDownBtn = document.getElementById('palette-scroll-down')!;
 
-	scrollUpBtn.addEventListener('click', () => {
-		scrollPalette(-1);
-	});
-
-	scrollDownBtn.addEventListener('click', () => {
-		scrollPalette(1);
-	});
-}
 
 function setupActionControls() {
 	const undoBtn = document.getElementById('undo-btn')!;
@@ -84,46 +80,6 @@ function setupActionControls() {
 	undoBtn.addEventListener('click', () => {
 		state.undoLastAction();
 	});
-}
-
-function setupPreviewModeUI() {
-	createPreviewPanel();
-	setupPreviewControls();
-}
-
-function createPreviewPanel() {
-	// Create preview panel if it doesn't exist
-	let previewPanel = document.getElementById('preview-panel');
-	if (!previewPanel) {
-		previewPanel = document.createElement('div');
-		previewPanel.id = 'preview-panel';
-		previewPanel.className = 'preview-panel hidden';
-
-		previewPanel.innerHTML = `
-			<div class="preview-header">
-				<h3>🎨 Preview Mode</h3>
-				<button id="preview-cancel" class="preview-btn cancel-btn">Cancel</button>
-			</div>
-			<div class="preview-options">
-				<label class="toggle-container">
-					<input type="checkbox" id="cost-mode-toggle">
-					<span class="toggle-slider"></span>
-					<span class="toggle-label">💰 Cost Mode</span>
-				</label>
-			</div>
-			<div class="cost-breakdown">
-				<div id="cost-summary">No pixels placed</div>
-				<div id="cost-details" class="cost-details"></div>
-			</div>
-			<div class="preview-actions">
-				<button id="preview-submit" class="preview-btn submit-btn" disabled>
-					Submit & Zap
-				</button>
-			</div>
-		`;
-
-		document.getElementById('ui-overlay')!.appendChild(previewPanel);
-	}
 }
 
 function setupPreviewControls() {
@@ -239,6 +195,9 @@ function updatePreviewModeUI() {
 	if (costModeToggle) {
 		costModeToggle.checked = state.previewState.showCostMode;
 	}
+
+	// Update palette layout when preview mode changes
+	updatePaletteLayout();
 }
 
 // UI update functions
@@ -276,72 +235,28 @@ function selectColor(color: string) {
 	});
 }
 
-function scrollPalette(direction: number) {
-	const totalRows = Math.ceil(PRESET_COLORS.length / COLORS_PER_ROW);
-	const buttonHeight = 28;
-	const scrollButtonHeight = 28;
-	const containerMargin = 20;
 
-	// Calculate available space and max visible rows with scroll buttons
-	const availableHeight = window.innerHeight - containerMargin;
-	const heightWithScrollButtons = availableHeight - (scrollButtonHeight * 2);
-	const maxVisibleRows = Math.floor(heightWithScrollButtons / buttonHeight);
-	const maxScrollOffset = Math.max(0, totalRows - maxVisibleRows);
-
-	// Update scroll offset
-	const newOffset = Math.max(0, Math.min(maxScrollOffset, state.paletteScrollOffset + direction * SCROLL_STEP));
-	state.paletteScrollOffset = newOffset;
-
-	updatePaletteLayout();
-}
 
 export function updatePaletteLayout() {
-	const colorPalette = document.getElementById('color-palette')!;
-	const scrollUpBtn = document.getElementById('palette-scroll-up')!;
-	const scrollDownBtn = document.getElementById('palette-scroll-down')!;
 	const container = document.getElementById('color-palette-scroll-container')!;
+	const paletteContainer = document.getElementById('color-palette-container')!;
 
-	// Calculate dimensions
-	const totalRows = Math.ceil(PRESET_COLORS.length / COLORS_PER_ROW);
-	const buttonHeight = 28; // 24px height + 4px gap
-	const scrollButtonHeight = 28; // Height of scroll buttons when visible
+	// Calculate available height considering preview panel
 	const containerMargin = 20; // Top and bottom margins
+	const previewPanel = document.getElementById('preview-panel');
+	let previewPanelHeight = 0;
 
-	// Available height for the palette
-	const availableHeight = window.innerHeight - containerMargin;
-	const maxPossibleRows = Math.floor(availableHeight / buttonHeight);
-
-	// Determine if scrolling is needed
-	const needsScrolling = totalRows > maxPossibleRows;
-
-	if (needsScrolling) {
-		// Calculate how many rows can fit with scroll buttons
-		const heightWithScrollButtons = availableHeight - (scrollButtonHeight * 2);
-		const maxVisibleRows = Math.floor(heightWithScrollButtons / buttonHeight);
-		const maxScrollOffset = Math.max(0, totalRows - maxVisibleRows);
-
-		// Show scroll buttons and limit scroll offset
-		scrollUpBtn.classList.toggle('hidden', state.paletteScrollOffset === 0);
-		scrollDownBtn.classList.toggle('hidden', state.paletteScrollOffset >= maxScrollOffset);
-
-		// Ensure scroll offset doesn't exceed maximum
-		state.paletteScrollOffset = Math.min(state.paletteScrollOffset, maxScrollOffset);
-
-		// Set container height to fit visible rows
-		container.style.height = `${maxVisibleRows * buttonHeight}px`;
-	} else {
-		// Hide scroll buttons and reset scroll
-		scrollUpBtn.classList.add('hidden');
-		scrollDownBtn.classList.add('hidden');
-		state.paletteScrollOffset = 0;
-
-		// Let container take up space for all colors
-		container.style.height = `${totalRows * buttonHeight}px`;
+	if (previewPanel && !previewPanel.classList.contains('hidden')) {
+		// If preview panel is visible, account for its height
+		const previewRect = previewPanel.getBoundingClientRect();
+		previewPanelHeight = previewRect.height + 20; // Add some margin
 	}
 
-	// Apply scroll transform
-	const scrollPixels = state.paletteScrollOffset * buttonHeight;
-	colorPalette.style.transform = `translateY(-${scrollPixels}px)`;
+	const availableHeight = window.innerHeight - containerMargin - previewPanelHeight;
+
+	// Set max height for container to enable scrolling when needed
+	container.style.maxHeight = `${Math.max(200, availableHeight)}px`;
+	paletteContainer.style.maxHeight = `${Math.max(240, availableHeight + 40)}px`;
 }
 
 function updateActionButtons() {
