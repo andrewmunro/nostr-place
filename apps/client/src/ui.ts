@@ -13,9 +13,15 @@ export function setupUI() {
 	setupPaletteScrollControls();
 	setupActionControls();
 	setupPreviewModeUI();
+	setupTutorial();
 
 	// Initial palette layout update
 	setTimeout(() => updatePaletteLayout(), 0);
+
+	// Show tutorial for first-time users
+	if (isFirstTimeUser()) {
+		showTutorial();
+	}
 }
 
 export function updateUI() {
@@ -253,6 +259,11 @@ export function setUserInfo(publicKey?: string) {
 	}
 }
 
+export function showTutorial() {
+	const tutorialModal = document.getElementById('tutorial-modal')!;
+	tutorialModal.classList.remove('hidden');
+}
+
 function selectColor(color: string) {
 	state.selectedColor = color;
 
@@ -362,4 +373,59 @@ function updateCoordinatesDisplay(x?: number, y?: number) {
 		const centerPixel = getCenterPixel();
 		coordsDisplay.textContent = `${centerPixel.x},${centerPixel.y}`;
 	}
+}
+
+// Tutorial functions
+function setupTutorial() {
+	const helpButton = document.getElementById('help-button')!;
+	const tutorialModal = document.getElementById('tutorial-modal')!;
+	const tutorialClose = document.getElementById('tutorial-close')!;
+	const tutorialStart = document.getElementById('tutorial-start')!;
+	const dontShowAgainCheckbox = document.getElementById('dont-show-again')! as HTMLInputElement;
+
+	// Help button click
+	helpButton.addEventListener('click', () => {
+		showTutorial();
+	});
+
+	// Close button click
+	tutorialClose.addEventListener('click', () => {
+		hideTutorial();
+	});
+
+	// Start button click
+	tutorialStart.addEventListener('click', () => {
+		const dontShowAgain = dontShowAgainCheckbox.checked;
+		if (dontShowAgain) {
+			markTutorialAsSeen();
+		}
+		hideTutorial();
+	});
+
+	// Close on background click
+	tutorialModal.addEventListener('click', (event) => {
+		if (event.target === tutorialModal) {
+			hideTutorial();
+		}
+	});
+
+	// Close on escape key
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && !tutorialModal.classList.contains('hidden')) {
+			hideTutorial();
+		}
+	});
+}
+
+function hideTutorial() {
+	const tutorialModal = document.getElementById('tutorial-modal')!;
+	tutorialModal.classList.add('hidden');
+}
+
+function isFirstTimeUser(): boolean {
+	return !localStorage.getItem('zappy-place-tutorial-seen');
+}
+
+function markTutorialAsSeen() {
+	localStorage.setItem('zappy-place-tutorial-seen', 'true');
 }

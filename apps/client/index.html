@@ -19,6 +19,8 @@
 				<span id="coordinates">992,226</span>
 			</div>
 
+			<div id="help-button" title="Help & Tutorial">?</div>
+
 			<div id="nostr-status-panel">
 				<div id="connection-status">🌐 Connecting...</div>
 				<div id="user-info" class="hidden"></div>
@@ -37,6 +39,109 @@
 				<div id="color-palette"></div>
 			</div>
 			<div id="palette-scroll-down" class="hidden">↓</div>
+		</div>
+	</div>
+
+	<div id="tutorial-modal" class="hidden">
+		<div class="tutorial-content">
+			<div class="tutorial-header">
+				<h2>🎨 Welcome to Zappy Place!</h2>
+				<button class="tutorial-close" id="tutorial-close">×</button>
+			</div>
+
+			<div class="tutorial-section">
+				<h3>⚡ What is Zappy Place?</h3>
+				<p>
+					Zappy Place is a fully decentralized, censorship-resistant pixel canvas inspired by Reddit Place.
+					It's powered by the <strong>Nostr protocol</strong> and <strong>Lightning Network</strong> for
+					instant, uncensorable pixel placement.
+				</p>
+				<p>
+					Unlike traditional pixel canvases that rely on centralized servers, Zappy Place lives entirely on
+					the Nostr network.
+					Your pixels are stored forever across distributed relays, making the canvas truly permanent and
+					unstoppable.
+				</p>
+			</div>
+
+			<div class="tutorial-section">
+				<h3>🎯 How to Play</h3>
+				<ul>
+					<li><strong>Choose a Color:</strong> Select from the color palette on the left</li>
+					<li><strong>Navigate:</strong> Use mouse/touch to pan around the canvas, zoom with scroll wheel or
+						buttons</li>
+					<li><strong>Place Pixels:</strong> Click anywhere on the canvas to enter preview mode</li>
+					<li><strong>Preview Mode:</strong> Place multiple pixels, see cost breakdown, and position your
+						design</li>
+					<li><strong>Submit & Zap:</strong> Pay with Lightning to make your pixels permanent</li>
+					<li><strong>Collaborate:</strong> Work with others to create amazing pixel art!</li>
+				</ul>
+			</div>
+
+			<div class="tutorial-section">
+				<h3>💰 Smart Pricing System</h3>
+				<p>
+					Zappy Place uses age-based pricing to encourage collaboration while protecting recent artwork.
+					The older a pixel is, the cheaper it becomes to overwrite:
+				</p>
+
+				<div class="pricing-grid">
+					<div class="pricing-item">
+						<strong>New Pixels</strong><br>
+						Empty spaces: <strong>1 sat</strong>
+					</div>
+					<div class="pricing-item expensive">
+						<strong>Fresh Pixels</strong><br>
+						&lt; 1 hour old: <strong>10 sats</strong>
+					</div>
+					<div class="pricing-item moderate">
+						<strong>Recent Pixels</strong><br>
+						1-24 hours old: <strong>5 sats</strong>
+					</div>
+					<div class="pricing-item cheap">
+						<strong>Older Pixels</strong><br>
+						1-7 days old: <strong>2 sats</strong>
+					</div>
+					<div class="pricing-item cheapest">
+						<strong>Ancient Pixels</strong><br>
+						&gt; 1 week old: <strong>1 sat</strong>
+					</div>
+				</div>
+
+				<p>
+					<strong>💡 Pro Tip:</strong> Enable "Cost Mode" in preview to see age-based color borders around
+					existing pixels!
+				</p>
+			</div>
+
+			<div class="tutorial-section">
+				<h3>🚀 Preview Mode Features</h3>
+				<ul>
+					<li><strong>Batch Placement:</strong> Place up to 300 pixels before submitting</li>
+					<li><strong>Cost Breakdown:</strong> See exactly how much your design will cost</li>
+					<li><strong>Smart Relocation:</strong> Drag your entire design to find cheaper spots</li>
+					<li><strong>Visual Feedback:</strong> Your pixels glow, existing pixels dim</li>
+					<li><strong>Undo Support:</strong> Use the undo button to remove preview pixels</li>
+				</ul>
+			</div>
+
+			<div class="tutorial-section">
+				<h3>🔑 Getting Started</h3>
+				<p>
+					To place pixels permanently, you'll need a <strong>Nostr identity</strong> and some
+					<strong>Lightning Network</strong> sats.
+					If you're new to Nostr, <a href="https://nostr.how/en/get-started" target="_blank">you can follow
+						this guide to get started!</a>
+				</p>
+			</div>
+
+			<div class="tutorial-footer">
+				<label>
+					<input type="checkbox" id="dont-show-again">
+					Don't show this again
+				</label>
+				<button id="tutorial-start">Start Creating!</button>
+			</div>
 		</div>
 	</div>
 
