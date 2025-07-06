@@ -1,8 +1,10 @@
 import * as PIXI from 'pixi.js';
 import { getCenterPixel, screenToWorld, smoothZoomToPoint } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
+import { nostrService } from './nostr';
 import { loadFromURL } from './persistence';
 import { state } from './state';
+import { hidePixelTooltip, showPixelModal, showPixelTooltip } from './ui';
 
 // Touch control constants
 const TOUCH_HOLD_DURATION = 150; // milliseconds to hold for placing pixel
@@ -89,7 +91,16 @@ function handlePinchGesture() {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-	// Zoom controls (zoom to center)
+	// Check if user is typing in an input field - if so, don't handle WASD controls
+	const activeElement = document.activeElement;
+	const isTyping = activeElement && (
+		activeElement.tagName === 'INPUT' ||
+		activeElement.tagName === 'TEXTAREA' ||
+		activeElement.tagName === 'SELECT' ||
+		(activeElement as HTMLElement).contentEditable === 'true'
+	);
+
+	// Zoom controls (zoom to center) - allow these even when typing
 	if (event.key === '=' || event.key === '+') {
 		event.preventDefault();
 		const centerX = state.app.screen.width / 2;
@@ -104,29 +115,32 @@ function handleKeyDown(event: KeyboardEvent) {
 		smoothZoomToPoint(newScale, centerX, centerY);
 	}
 
-	// Camera movement (WASD or Arrow keys)
-	const moveSpeed = 50 / state.camera.scale; // Slower movement when zoomed in
+	// Skip WASD camera movement if user is typing in an input field
+	if (!isTyping) {
+		// Camera movement (WASD or Arrow keys)
+		const moveSpeed = 50 / state.camera.scale; // Slower movement when zoomed in
 
-	if (event.key === 'w' || event.key === 'W' || event.key === 'ArrowUp') {
-		event.preventDefault();
-		state.updateCamera({
-			y: state.camera.y - moveSpeed
-		});
-	} else if (event.key === 's' || event.key === 'S' || event.key === 'ArrowDown') {
-		event.preventDefault();
-		state.updateCamera({
-			y: state.camera.y + moveSpeed
-		});
-	} else if (event.key === 'a' || event.key === 'A' || event.key === 'ArrowLeft') {
-		event.preventDefault();
-		state.updateCamera({
-			x: state.camera.x - moveSpeed
-		});
-	} else if (event.key === 'd' || event.key === 'D' || event.key === 'ArrowRight') {
-		event.preventDefault();
-		state.updateCamera({
-			x: state.camera.x + moveSpeed
-		});
+		if (event.key === 'w' || event.key === 'W' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			state.updateCamera({
+				y: state.camera.y - moveSpeed
+			});
+		} else if (event.key === 's' || event.key === 'S' || event.key === 'ArrowDown') {
+			event.preventDefault();
+			state.updateCamera({
+				y: state.camera.y + moveSpeed
+			});
+		} else if (event.key === 'a' || event.key === 'A' || event.key === 'ArrowLeft') {
+			event.preventDefault();
+			state.updateCamera({
+				x: state.camera.x - moveSpeed
+			});
+		} else if (event.key === 'd' || event.key === 'D' || event.key === 'ArrowRight') {
+			event.preventDefault();
+			state.updateCamera({
+				x: state.camera.x + moveSpeed
+			});
+		}
 	}
 
 	// Preview mode shortcuts
@@ -192,6 +206,16 @@ function cancelTouchHold() {
 
 function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 	const globalPos = event.global;
+
+	// Check if pixel modal should be shown first (for non-preview mode)
+	if (!state.previewState.isActive && event.button === 0) {
+		const worldPos = screenToWorld(globalPos.x, globalPos.y);
+		const pixelInfo = checkPixelClick(worldPos.x, worldPos.y);
+		if (pixelInfo) {
+			showPixelModal(pixelInfo.message, pixelInfo.url);
+			return; // Modal was shown, don't handle preview pixel placement
+		}
+	}
 
 	// Check if this is a touch event
 	const isTouch = event.pointerType === 'touch';
@@ -309,6 +333,14 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 				mouseCursorPixel: null
 			});
 		}
+
+		// Check for pixel hover (show tooltip)
+		const pixelInfo = checkPixelHover(worldPos.x, worldPos.y);
+		if (pixelInfo && pixelInfo.message) {
+			showPixelTooltip(globalPos.x, globalPos.y, pixelInfo.message);
+		} else {
+			hidePixelTooltip();
+		}
 	}
 }
 
@@ -352,26 +384,39 @@ function handlePointerUp(event: PIXI.FederatedPointerEvent) {
 }
 
 function handlePointerLeave(event: PIXI.FederatedPointerEvent) {
-	// Cancel touch hold if active
-	cancelTouchHold();
+	// Hide tooltip when mouse leaves canvas
+	hidePixelTooltip();
 
-	// Clear mouse cursor position if it's a mouse event
-	if (event.pointerType !== 'touch') {
-		state.updatePointerState({ mouseCursorPixel: null });
-	}
-
-	// Clear all touch tracking
-	state.updateTouchState({
-		activeTouches: new Map(),
-		isPinching: false,
-		pinchStartDistance: 0,
-		pinchStartScale: 1,
-		pinchCenter: null
+	// Clear mouse cursor position
+	state.updatePointerState({
+		mouseCursorPixel: null
 	});
 
-	// Stop dragging
-	state.updatePointerState({ isDragging: false });
-	(state.app.view as HTMLCanvasElement).style.cursor = 'default';
+	// Remove touch from tracking
+	if (event.pointerType === 'touch') {
+		state.touchState.activeTouches.delete(event.pointerId);
+
+		// Reset pinch state when no touches remain
+		if (state.touchState.activeTouches.size === 0) {
+			state.updateTouchState({
+				isPinching: false,
+				pinchStartDistance: 0,
+				pinchStartScale: 1,
+				pinchCenter: null
+			});
+		}
+	}
+
+	// Cancel touch hold if active and no touches remain
+	if (state.touchState.activeTouches.size === 0) {
+		cancelTouchHold();
+	}
+
+	// Stop dragging if no touches remain or it's a mouse event
+	if (state.touchState.activeTouches.size === 0 || event.pointerType !== 'touch') {
+		state.updatePointerState({ isDragging: false });
+		(state.app.view as HTMLCanvasElement).style.cursor = 'crosshair';
+	}
 }
 
 function handleWheel(event: PIXI.FederatedWheelEvent) {
@@ -404,4 +449,86 @@ function togglePreviewPixel(x: number, y: number, color: string) {
 		// No existing preview pixel, add new one
 		state.addPreviewPixel(x, y, color);
 	}
+}
+
+// Add hover detection for pixel messages
+export function checkPixelHover(worldX: number, worldY: number): { message?: string; url?: string } | null {
+	const pixelX = Math.floor(worldX);
+	const pixelY = Math.floor(worldY);
+
+	// Check debug mode pixels first
+	const debugPixelData = state.pixels.get(`${pixelX},${pixelY}`);
+	if (debugPixelData) {
+		// For debug mode, hardcode test messages for specific coordinates
+		if (pixelX === 1000 && pixelY === 1000) {
+			return { message: '🚀 Welcome to Zappy Place!', url: 'https://github.com/andrewmunro/zappy-place' };
+		} else if (pixelX === 1001 && pixelY === 1000) {
+			return { message: 'This is a test message for the tooltip system. Hover over me!' };
+		} else if (pixelX === 1002 && pixelY === 1000) {
+			return { message: 'Click me to see the modal!', url: 'https://nostr.com' };
+		} else if (pixelX === 1003 && pixelY === 1000) {
+			return { url: 'https://bitcoin.org' };
+		} else if (pixelX === 1004 && pixelY === 1000) {
+			return { message: '🎨 Collaborative pixel art powered by Nostr + Lightning!', url: 'https://zappy.place' };
+		} else if (pixelX === 500 && pixelY === 500) {
+			return { message: '🔥 This is awesome!' };
+		} else if (pixelX === 501 && pixelY === 500) {
+			return { message: '💎 HODL Bitcoin!', url: 'https://bitcoin.org' };
+		} else if (pixelX === 502 && pixelY === 500) {
+			return { message: '⚡ Lightning fast!' };
+		} else if (pixelX === 500 && pixelY === 501) {
+			return { message: '🌈 So many colors!' };
+		} else if (pixelX === 501 && pixelY === 501) {
+			return { message: 'Check out our repo!', url: 'https://github.com/andrewmunro/zappy-place' };
+		}
+	}
+
+	// Check Nostr canvas pixels
+	const nostrPixelEvent = nostrService.canvas.getPixelEvent(pixelX, pixelY);
+	if (nostrPixelEvent && (nostrPixelEvent.message || nostrPixelEvent.url)) {
+		return { message: nostrPixelEvent.message, url: nostrPixelEvent.url };
+	}
+
+	return null;
+}
+
+// Add click handling for pixel modal
+export function checkPixelClick(worldX: number, worldY: number): { message?: string; url?: string } | null {
+	const pixelX = Math.floor(worldX);
+	const pixelY = Math.floor(worldY);
+
+	// Check debug mode pixels first
+	const debugPixelData = state.pixels.get(`${pixelX},${pixelY}`);
+	if (debugPixelData) {
+		// For debug mode, hardcode test messages for specific coordinates
+		if (pixelX === 1000 && pixelY === 1000) {
+			return { message: '🚀 Welcome to Zappy Place!', url: 'https://github.com/andrewmunro/zappy-place' };
+		} else if (pixelX === 1001 && pixelY === 1000) {
+			return { message: 'This is a test message for the tooltip system. Hover over me!' };
+		} else if (pixelX === 1002 && pixelY === 1000) {
+			return { message: 'Click me to see the modal!', url: 'https://nostr.com' };
+		} else if (pixelX === 1003 && pixelY === 1000) {
+			return { url: 'https://bitcoin.org' };
+		} else if (pixelX === 1004 && pixelY === 1000) {
+			return { message: '🎨 Collaborative pixel art powered by Nostr + Lightning!', url: 'https://zappy.place' };
+		} else if (pixelX === 500 && pixelY === 500) {
+			return { message: '🔥 This is awesome!' };
+		} else if (pixelX === 501 && pixelY === 500) {
+			return { message: '💎 HODL Bitcoin!', url: 'https://bitcoin.org' };
+		} else if (pixelX === 502 && pixelY === 500) {
+			return { message: '⚡ Lightning fast!' };
+		} else if (pixelX === 500 && pixelY === 501) {
+			return { message: '🌈 So many colors!' };
+		} else if (pixelX === 501 && pixelY === 501) {
+			return { message: 'Check out our repo!', url: 'https://github.com/andrewmunro/zappy-place' };
+		}
+	}
+
+	// Check Nostr canvas pixels
+	const nostrPixelEvent = nostrService.canvas.getPixelEvent(pixelX, pixelY);
+	if (nostrPixelEvent && (nostrPixelEvent.message || nostrPixelEvent.url)) {
+		return { message: nostrPixelEvent.message, url: nostrPixelEvent.url };
+	}
+
+	return null;
 } 

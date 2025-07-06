@@ -1,4 +1,4 @@
-import { CostBreakdown } from '@zappy-place/nostr-client';
+import { CostBreakdown, PixelData } from '@zappy-place/nostr-client';
 import * as PIXI from 'pixi.js';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
 import { nostrService } from './nostr';
@@ -38,13 +38,6 @@ export interface PixelAction {
 	pixel: PixelData;
 }
 
-// Simple preview pixel for UI state only
-export interface PixelData {
-	x: number;
-	y: number;
-	color: string;
-}
-
 export interface PreviewState {
 	isActive: boolean;
 	pixels: Map<string, PixelData>; // Key: "x,y"
@@ -54,6 +47,12 @@ export interface PreviewState {
 	dragStartPos: { x: number; y: number } | null;
 	showCostMode: boolean; // Toggle for showing borders and age indicators
 	minimized: boolean; // Whether the preview panel is minimized
+	message?: string; // User-input message for the pixel event
+	url?: string; // User-input URL for the pixel event
+	validationErrors?: {
+		message?: string;
+		url?: string;
+	};
 }
 
 class State {
@@ -213,7 +212,10 @@ class State {
 			dragOffset: { x: 0, y: 0 },
 			dragStartPos: null,
 			showCostMode: false,
-			minimized: false
+			minimized: false,
+			message: undefined,
+			url: undefined,
+			validationErrors: undefined
 		});
 	}
 

@@ -11,6 +11,8 @@ export interface PixelEvent {
 	amount: number;
 	senderPubkey?: string;
 	timestamp?: number;
+	message?: string;
+	url?: string;
 }
 
 export interface CanvasConfig {

@@ -5,7 +5,6 @@ import { nostrService } from './nostr';
 import { loadFromURL, updateURL } from './persistence';
 import { setupRenderer, updateRenderer } from './renderer';
 import { state } from './state';
-import './style.css';
 import { setupUI, setUserInfo, updateUI } from './ui';
 
 // Update user info when authenticated

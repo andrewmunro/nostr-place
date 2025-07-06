@@ -62,7 +62,7 @@ class NostrService {
 	}
 
 	// Submit preview pixels as a batch
-	async submitPreviewPixels(): Promise<void> {
+	async submitPreviewPixels(message?: string, url?: string): Promise<void> {
 		if (!state.previewState.isActive || state.previewState.pixels.size === 0) {
 			throw new Error('No preview pixels to submit');
 		}
@@ -70,6 +70,8 @@ class NostrService {
 		const pixelEvent: PixelEvent = {
 			pixels: Array.from(state.previewState.pixels.values()),
 			amount: state.previewState.costBreakdown.totalSats,
+			message,
+			url
 		}
 
 		if (isDebugMode()) {
@@ -79,8 +81,6 @@ class NostrService {
 		}
 
 		try {
-
-
 			await this.canvas.publishPixelEvent(pixelEvent, isFreePlacement());
 
 			// Clear preview after successful submission

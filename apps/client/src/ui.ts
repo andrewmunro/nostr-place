@@ -12,6 +12,8 @@ export function setupUI() {
 	setupActionControls();
 	setupPreviewControls();
 	setupTutorial();
+	setupPixelTooltip();
+	setupPixelModal();
 
 	// Show tutorial for first-time users
 	if (isFirstTimeUser()) {
@@ -69,8 +71,6 @@ function setupZoomControls() {
 	});
 }
 
-
-
 function setupActionControls() {
 	const undoBtn = document.getElementById('undo-btn')!;
 
@@ -84,16 +84,89 @@ function setupPreviewControls() {
 	const cancelBtn = document.getElementById('preview-cancel')!;
 	const minimizeBtn = document.getElementById('preview-minimize')!;
 	const costModeToggle = document.getElementById('cost-mode-toggle')! as HTMLInputElement;
+	const messageInput = document.getElementById('preview-message')! as HTMLTextAreaElement;
+	const urlInput = document.getElementById('preview-url')! as HTMLInputElement;
 
 	submitBtn.addEventListener('click', handlePreviewSubmit);
 	cancelBtn.addEventListener('click', handlePreviewCancel);
 	minimizeBtn.addEventListener('click', handlePreviewMinimize);
 	costModeToggle.addEventListener('change', handleCostModeToggle);
+	messageInput.addEventListener('input', handleMessageChange);
+	urlInput.addEventListener('input', handleUrlChange);
 }
 
 function handleCostModeToggle(event: Event) {
 	const target = event.target as HTMLInputElement;
 	state.updatePreviewState({ showCostMode: target.checked });
+}
+
+function handleMessageChange(event: Event) {
+	const target = event.target as HTMLTextAreaElement;
+	const message = target.value.trim();
+
+	// Validate message length
+	const isValid = message.length <= 150;
+
+	// Update validation state
+	target.classList.toggle('invalid', !isValid);
+
+	// Update help text
+	const helpText = target.parentElement?.querySelector('.input-help') as HTMLElement;
+	if (helpText) {
+		if (!isValid) {
+			helpText.textContent = `Message too long (${message.length}/150 characters)`;
+			helpText.classList.add('error');
+		} else {
+			helpText.textContent = 'Share a message with your pixel art (max 150 characters)';
+			helpText.classList.remove('error');
+		}
+	}
+
+	state.updatePreviewState({
+		message: message || undefined,
+		validationErrors: {
+			...state.previewState.validationErrors,
+			message: !isValid ? 'Message too long' : undefined
+		}
+	});
+}
+
+function handleUrlChange(event: Event) {
+	const target = event.target as HTMLInputElement;
+	const url = target.value.trim();
+
+	// Validate URL format (only if not empty)
+	let isValid = true;
+	if (url) {
+		try {
+			new URL(url);
+		} catch {
+			isValid = false;
+		}
+	}
+
+	// Update validation state
+	target.classList.toggle('invalid', !isValid);
+
+	// Update help text
+	const helpText = target.parentElement?.querySelector('.input-help') as HTMLElement;
+	if (helpText) {
+		if (!isValid) {
+			helpText.textContent = 'Please enter a valid URL (e.g., https://example.com)';
+			helpText.classList.add('error');
+		} else {
+			helpText.textContent = 'Add a clickable link to your pixels';
+			helpText.classList.remove('error');
+		}
+	}
+
+	state.updatePreviewState({
+		url: url || undefined,
+		validationErrors: {
+			...state.previewState.validationErrors,
+			url: !isValid ? 'Invalid URL format' : undefined
+		}
+	});
 }
 
 async function handlePreviewSubmit() {
@@ -105,8 +178,8 @@ async function handlePreviewSubmit() {
 		submitBtn.disabled = true;
 		submitBtn.textContent = 'Processing...';
 
-		// Submit preview pixels using nostr service
-		await nostrService.submitPreviewPixels();
+		// Submit preview pixels using nostr service with message and URL
+		await nostrService.submitPreviewPixels(state.previewState.message, state.previewState.url);
 
 		// If successful, exit preview mode
 		handlePreviewCancel();
@@ -130,6 +203,29 @@ async function handlePreviewSubmit() {
 }
 
 function handlePreviewCancel() {
+	// Clear input fields and validation states
+	const messageInput = document.getElementById('preview-message')! as HTMLTextAreaElement;
+	const urlInput = document.getElementById('preview-url')! as HTMLInputElement;
+	messageInput.value = '';
+	urlInput.value = '';
+
+	// Clear validation styles
+	messageInput.classList.remove('invalid');
+	urlInput.classList.remove('invalid');
+
+	// Reset help text
+	const messageHelp = messageInput.parentElement?.querySelector('.input-help') as HTMLElement;
+	if (messageHelp) {
+		messageHelp.textContent = 'Share a message with your pixel art (max 150 characters)';
+		messageHelp.classList.remove('error');
+	}
+
+	const urlHelp = urlInput.parentElement?.querySelector('.input-help') as HTMLElement;
+	if (urlHelp) {
+		urlHelp.textContent = 'Add a clickable link to your pixels';
+		urlHelp.classList.remove('error');
+	}
+
 	state.exitPreviewMode();
 	updatePreviewModeUI();
 }
@@ -161,6 +257,7 @@ function updatePreviewModeUI() {
 	// Get content elements to show/hide based on minimized state
 	const previewOptions = document.querySelector('.preview-options') as HTMLElement;
 	const costBreakdown = document.querySelector('.cost-breakdown') as HTMLElement;
+	const previewInputs = document.querySelector('.preview-inputs') as HTMLElement;
 	const previewActions = document.querySelector('.preview-actions') as HTMLElement;
 
 	if (state.previewState.isActive && state.previewState.pixels.size > 0) {
@@ -193,9 +290,10 @@ function updatePreviewModeUI() {
 		}
 		costDetails.textContent = parts.length > 0 ? `${parts.join(', ')} = ${totalSats} sats total` : '';
 
-		// Enable submit button
-		submitBtn.disabled = false;
-		submitBtn.textContent = `⚡ Zap ${totalSats} sats`;
+		// Enable submit button only if no validation errors
+		const hasValidationErrors = state.previewState.validationErrors?.message || state.previewState.validationErrors?.url;
+		submitBtn.disabled = !!hasValidationErrors;
+		submitBtn.textContent = hasValidationErrors ? 'Fix validation errors' : `⚡ Zap ${totalSats} sats`;
 
 	} else if (state.previewState.isActive) {
 		// Show panel but with no pixels message
@@ -219,6 +317,9 @@ function updatePreviewModeUI() {
 		if (costBreakdown) {
 			costBreakdown.classList.add('hidden');
 		}
+		if (previewInputs) {
+			previewInputs.classList.add('hidden');
+		}
 		if (previewActions) {
 			previewActions.classList.add('hidden');
 		}
@@ -229,6 +330,9 @@ function updatePreviewModeUI() {
 		}
 		if (costBreakdown) {
 			costBreakdown.classList.remove('hidden');
+		}
+		if (previewInputs) {
+			previewInputs.classList.remove('hidden');
 		}
 		if (previewActions) {
 			previewActions.classList.remove('hidden');
@@ -279,10 +383,6 @@ function selectColor(color: string) {
 		}
 	});
 }
-
-
-
-
 
 function updateActionButtons() {
 	const undoBtn = document.getElementById('undo-btn')! as HTMLButtonElement;
@@ -368,4 +468,78 @@ function isFirstTimeUser(): boolean {
 
 function markTutorialAsSeen() {
 	localStorage.setItem('zappy-place-tutorial-seen', 'true');
+}
+
+function setupPixelTooltip() {
+	// Tooltip functionality is handled in the input system
+	// This function can be used for any tooltip-specific setup if needed
+}
+
+function setupPixelModal() {
+	const pixelModal = document.getElementById('pixel-modal')!;
+	const pixelModalClose = document.getElementById('pixel-modal-close')!;
+
+	// Close modal when clicking the close button
+	pixelModalClose.addEventListener('click', () => {
+		hidePixelModal();
+	});
+
+	// Close modal when clicking outside
+	pixelModal.addEventListener('click', (event) => {
+		if (event.target === pixelModal) {
+			hidePixelModal();
+		}
+	});
+
+	// Close modal when pressing escape
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && !pixelModal.classList.contains('hidden')) {
+			hidePixelModal();
+		}
+	});
+}
+
+export function showPixelTooltip(x: number, y: number, message: string) {
+	const tooltip = document.getElementById('pixel-tooltip')!;
+	tooltip.textContent = message;
+	tooltip.style.left = `${x + 10}px`;
+	tooltip.style.top = `${y - 10}px`;
+	tooltip.classList.remove('hidden');
+}
+
+export function hidePixelTooltip() {
+	const tooltip = document.getElementById('pixel-tooltip')!;
+	tooltip.classList.add('hidden');
+}
+
+export function showPixelModal(message?: string, url?: string) {
+	const pixelModal = document.getElementById('pixel-modal')!;
+	const pixelModalMessage = document.getElementById('pixel-modal-message')!;
+	const pixelModalUrl = document.getElementById('pixel-modal-url')!;
+
+	// Set message content
+	if (message) {
+		pixelModalMessage.textContent = message;
+		pixelModalMessage.style.display = 'block';
+	} else {
+		pixelModalMessage.style.display = 'none';
+	}
+
+	// Set URL content
+	if (url) {
+		pixelModalUrl.innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url.length > 30 ? url.slice(0, 30) + '...' : url}</a>`;
+		pixelModalUrl.style.display = 'block';
+	} else {
+		pixelModalUrl.style.display = 'none';
+	}
+
+	// Show modal if there's any content
+	if (message || url) {
+		pixelModal.classList.remove('hidden');
+	}
+}
+
+export function hidePixelModal() {
+	const pixelModal = document.getElementById('pixel-modal')!;
+	pixelModal.classList.add('hidden');
 }

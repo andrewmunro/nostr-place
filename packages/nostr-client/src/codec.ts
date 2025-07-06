@@ -1,12 +1,6 @@
 import { NostrEvent } from 'nostr-tools';
 import * as pako from 'pako';
-import { PixelEvent } from './types';
-
-export interface PixelData {
-	x: number;
-	y: number;
-	color: string;
-}
+import { PixelData, PixelEvent } from './types';
 
 export function encodePixels(pixels: PixelData[]): string {
 	// Convert pixels to the expected format: x,y,color\nx,y,color\n...
@@ -52,17 +46,27 @@ export class PixelCodec {
 	encodePixelEvent(pixelEvent: PixelEvent, debug = false): NostrEvent {
 		const encodedContent = encodePixels(pixelEvent.pixels);
 
+		const tags = [
+			['p', this.canvasPubkey],
+			['relays', ...this.relays],
+			['amount', (pixelEvent.amount * 1000).toString()],
+			['app', 'Zappy Place'],
+			['encoding', 'gzip+base64:v1'],
+		];
+
+		// Add message and URL as tags if present
+		if (pixelEvent.message) {
+			tags.push(['message', pixelEvent.message]);
+		}
+		if (pixelEvent.url) {
+			tags.push(['url', pixelEvent.url]);
+		}
+
 		return {
 			kind: debug ? 90001 : 9734,
 			created_at: Math.floor(Date.now() / 1000),
 			content: encodedContent,
-			tags: [
-				['p', this.canvasPubkey],
-				['relays', ...this.relays],
-				['amount', (pixelEvent.amount * 1000).toString()],
-				['app', 'Zappy Place'],
-				['encoding', 'gzip+base64:v1'],
-			],
+			tags,
 			pubkey: '',
 			id: '',
 			sig: ''
@@ -70,11 +74,16 @@ export class PixelCodec {
 	}
 
 	decodePixelEvent(event: NostrEvent): PixelEvent {
+		const messageTag = event.tags.find(t => t[0] === 'message');
+		const urlTag = event.tags.find(t => t[0] === 'url');
+
 		return {
 			pixels: decodePixels(event.content),
 			timestamp: event.created_at,
 			senderPubkey: event.pubkey,
-			amount: parseInt(event.tags.find(t => t[0] === 'amount')?.[1] || '0', 10)
+			amount: parseInt(event.tags.find(t => t[0] === 'amount')?.[1] || '0', 10),
+			message: messageTag?.[1],
+			url: urlTag?.[1]
 		};
 	}
 }

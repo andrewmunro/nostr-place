@@ -14,6 +14,8 @@
 	<meta name="format-detection" content="telephone=no" />
 	<meta name="msapplication-tap-highlight" content="no" />
 
+	<link rel="stylesheet" href="src/style.css">
+
 	<link rel="icon"
 		href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%2210 0 100 100%22><text y=%22.90em%22 font-size=%2290%22>⚡</text></svg>" />
 	<title>Zappy Place</title>
@@ -59,6 +61,19 @@
 				<div class="cost-breakdown">
 					<div id="cost-summary">No pixels placed</div>
 					<div id="cost-details" class="cost-details"></div>
+				</div>
+				<div class="preview-inputs">
+					<div class="input-group">
+						<label for="preview-message">💬 Message (optional)</label>
+						<textarea id="preview-message" placeholder="Add a message to your pixels..." maxlength="150"
+							rows="2"></textarea>
+						<small class="input-help">Share a message with your pixel art (max 150 characters)</small>
+					</div>
+					<div class="input-group">
+						<label for="preview-url">🔗 URL (optional)</label>
+						<input type="url" id="preview-url" placeholder="https://example.com">
+						<small class="input-help">Add a clickable link to your pixels</small>
+					</div>
 				</div>
 				<div class="preview-actions">
 					<button id="preview-submit" class="preview-btn submit-btn" disabled>
@@ -175,6 +190,23 @@
 					Don't show this again
 				</label>
 				<button id="tutorial-start">Start Creating!</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Pixel Tooltip -->
+	<div id="pixel-tooltip" class="pixel-tooltip hidden"></div>
+
+	<!-- Pixel Info Modal -->
+	<div id="pixel-modal" class="pixel-modal hidden">
+		<div class="pixel-modal-content">
+			<div class="pixel-modal-header">
+				<h3>📍 Pixel Info</h3>
+				<button class="pixel-modal-close" id="pixel-modal-close">×</button>
+			</div>
+			<div class="pixel-modal-body">
+				<div id="pixel-modal-message" class="pixel-modal-message"></div>
+				<div id="pixel-modal-url" class="pixel-modal-url"></div>
 			</div>
 		</div>
 	</div>
