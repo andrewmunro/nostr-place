@@ -44,7 +44,8 @@ export class NostrCanvas extends NostrClient {
 
 		while (true) {
 			const filter: Filter = {
-				kinds: [9735],
+				kinds: [90001, 9735],
+				'#p': [LIGHTNING_CONFIG.PUBKEY],
 				limit: eventsPerPage,
 				until: currentUntil
 			};
@@ -89,8 +90,9 @@ export class NostrCanvas extends NostrClient {
 
 	private subscribeToRealTimeEvents(): void {
 		const filter: Filter = {
-			kinds: [9735],
-			since: Math.floor(Date.now() / 1000)
+			kinds: [90001, 9735],
+			'#p': [LIGHTNING_CONFIG.PUBKEY],
+			since: Math.floor(Date.now() / 1000) - (3600 * 2)
 		};
 
 		this.pool.subscribe(this.connectedRelays, filter, {
@@ -106,6 +108,12 @@ export class NostrCanvas extends NostrClient {
 
 	private handlePixelEvent(event: NostrEvent): void {
 		if (event.kind !== 90001 && event.kind !== 9735) return;
+
+		if (event.kind === 9735) {
+			const description = JSON.parse(event.tags.find(t => t[0] === 'description')?.[1] || '{}');
+			event = description;
+		}
+
 		if (!event.tags.some(t => t[0] === 'app' && t[1] === 'Zappy Place')) return;
 
 		const pixelEvent = this.codec.decodePixelEvent(event);
@@ -200,7 +208,7 @@ export function createDefaultConfig(): NostrClientConfig {
 		pagination: {
 			eventsPerPage: 100,
 			requestDelay: 1000, // 1 second between pages
-			since: Math.floor(Date.now() / 1000) - 86400 * 0.5 // 1 days ago
+			since: 1751821200 // Sunday, 6 July 2025 17:00:00
 		}
 	};
 } 

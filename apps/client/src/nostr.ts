@@ -7,6 +7,11 @@ function isDebugMode(): boolean {
 	return urlParams.has('debug');
 }
 
+function isFreePlacement(): boolean {
+	const urlParams = new URLSearchParams(window.location.search);
+	return urlParams.has('free');
+}
+
 class NostrService {
 	canvas: NostrCanvas;
 	isInitialized = false;
@@ -74,7 +79,9 @@ class NostrService {
 		}
 
 		try {
-			await this.canvas.publishPixelEvent(pixelEvent, false);
+
+
+			await this.canvas.publishPixelEvent(pixelEvent, isFreePlacement());
 
 			// Clear preview after successful submission
 			state.exitPreviewMode();
