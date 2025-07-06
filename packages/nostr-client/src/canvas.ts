@@ -166,7 +166,7 @@ export class NostrCanvas extends NostrClient {
 
 	calculateCost(pixels: Array<{ x: number; y: number; color: string }>): CostBreakdown {
 		const previewPixels: PreviewPixel[] = pixels.map(p => {
-			const existingPixel = this.pixels.get(`${p.x},${p.y}`);
+			const existingPixel = this.getPixelEvent(p.x, p.y);
 			const cost = getPixelPrice(existingPixel?.timestamp ? existingPixel.timestamp * 1000 : null);
 			const isNew = !existingPixel;
 			let existingPixelAge: number | undefined;
@@ -186,6 +186,10 @@ export class NostrCanvas extends NostrClient {
 		});
 
 		return calculateCostBreakdown(previewPixels);
+	}
+
+	getPixelEvent(x: number, y: number): PixelEvent | undefined {
+		return this.pixels.get(`${x},${y}`);
 	}
 
 	async disconnect(): Promise<void> {

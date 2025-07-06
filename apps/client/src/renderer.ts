@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { screenToWorld } from './camera';
 import { PREVIEW_MODE, WORLD_SIZE } from './constants';
+import { nostrService } from './nostr';
 import { state } from './state';
 
 // Cache for reusable graphics objects
@@ -165,12 +166,12 @@ function renderPreviewPixels() {
 
 		// Add simple border for preview pixels (only if cost mode is enabled)
 		if (state.previewState.showCostMode) {
-			const existingPixel = state.pixels.get(`${x},${y}`);
+			const existingPixel = nostrService.canvas.getPixelEvent(x, y);
 			let borderColor = 0x00FF00; // Green for new pixels
 
 			if (existingPixel) {
 				// Color based on age for existing pixels being overwritten
-				const ageHours = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
+				const ageHours = (Date.now() - existingPixel.timestamp! * 1000) / (1000 * 60 * 60);
 				if (ageHours < 1) borderColor = 0xFF4444; // Red - expensive (fresh)
 				else if (ageHours < 24) borderColor = 0xFF8800; // Orange - moderate (recent)
 				else if (ageHours < 168) borderColor = 0xFFAA00; // Yellow - cheap (older)
@@ -215,11 +216,10 @@ function renderAgeIndicators() {
 	// Add age indicators for existing pixels
 	for (let x = minX; x <= maxX; x++) {
 		for (let y = minY; y <= maxY; y++) {
-			const pixelKey = `${x},${y}`;
-			const existingPixel = state.pixels.get(pixelKey);
+			const existingPixel = nostrService.canvas.getPixelEvent(x, y);
 
-			if (existingPixel && existingPixel.isValid) {
-				const ageHours = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
+			if (existingPixel) {
+				const ageHours = (Date.now() - existingPixel.timestamp! * 1000) / (1000 * 60 * 60);
 
 				// Calculate age category color locally
 				let color: string;
