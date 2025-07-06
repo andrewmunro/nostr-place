@@ -1,6 +1,7 @@
+import { CostBreakdown } from '@zappy-place/nostr-client';
 import * as PIXI from 'pixi.js';
 import { DEFAULT_SCALE, WORLD_SIZE } from './constants';
-import { calculateCostBreakdown, getPixelPrice } from './pricing';
+import { nostrService } from './nostr';
 
 export interface CameraState {
 	x: number;
@@ -32,34 +33,21 @@ export interface TouchState {
 }
 
 export interface PixelAction {
-	x: number;
-	y: number;
 	action: 'add' | 'remove';
-	color?: string; // Color when adding
 	timestamp: number;
+	pixel: PixelData;
 }
 
-export interface PreviewPixel {
+// Simple preview pixel for UI state only
+export interface PixelData {
 	x: number;
 	y: number;
 	color: string;
-	isNew: boolean;
-	existingPixelAge?: number; // Age in hours if overwriting
-	cost: number; // Cost in msats
-}
-
-export interface CostBreakdown {
-	newPixels: number;
-	freshPixels: number;
-	recentPixels: number;
-	olderPixels: number;
-	ancientPixels: number;
-	totalCost: number;
 }
 
 export interface PreviewState {
 	isActive: boolean;
-	pixels: Map<string, PreviewPixel>; // Key: "x,y"
+	pixels: Map<string, PixelData>; // Key: "x,y"
 	costBreakdown: CostBreakdown;
 	isDragging: boolean;
 	dragOffset: { x: number; y: number };
@@ -70,7 +58,7 @@ export interface PreviewState {
 class State {
 	// Global state
 	selectedColor: string = '#A06A42'; // Brown color that was selected in the original palette
-	pixels = new Map(); // Will be populated by Nostr events
+	pixels = new Map<string, PixelData>(); // Will be populated by Nostr events
 
 	// Undo history for preview actions
 	undoHistory: PixelAction[] = [];
@@ -129,12 +117,14 @@ class State {
 		isActive: false,
 		pixels: new Map(),
 		costBreakdown: {
-			newPixels: 0,
-			freshPixels: 0,
-			recentPixels: 0,
-			olderPixels: 0,
-			ancientPixels: 0,
-			totalCost: 0
+			totalSats: 0,
+			pixelCounts: {
+				new: 0,
+				fresh: 0,
+				recent: 0,
+				older: 0,
+				ancient: 0
+			}
 		},
 		isDragging: false,
 		dragOffset: { x: 0, y: 0 },
@@ -142,10 +132,8 @@ class State {
 		showCostMode: false
 	};
 
-	// Helper methods for complex updates
 	updateCamera(updates: Partial<CameraState>) {
 		this.camera = { ...this.camera, ...updates };
-		// Also update target values to prevent conflicts with smooth interpolation
 		if (updates.x !== undefined) this.camera.targetX = updates.x;
 		if (updates.y !== undefined) this.camera.targetY = updates.y;
 		if (updates.scale !== undefined) this.camera.targetScale = updates.scale;
@@ -173,37 +161,22 @@ class State {
 		const lastAction = this.undoHistory.pop();
 		if (!lastAction) return;
 
-		const pixelKey = `${lastAction.x},${lastAction.y}`;
+		const pixelKey = `${lastAction.pixel.x},${lastAction.pixel.y}`;
 
 		if (lastAction.action === 'add') {
 			// Action was adding a preview pixel, so remove it
 			if (this.previewState.pixels.has(pixelKey)) {
-				// Remove without adding to undo history to avoid recursion
 				this.previewState.pixels.delete(pixelKey);
 				this.updateCostBreakdown();
 			}
-		} else if (lastAction.action === 'remove' && lastAction.color) {
+		} else if (lastAction.action === 'remove' && lastAction.pixel.color) {
 			// Action was removing a preview pixel, so add it back
 			if (!this.previewState.pixels.has(pixelKey)) {
-				// Add back without adding to undo history to avoid recursion
-				const existingPixel = this.pixels.get(pixelKey);
-				const cost = getPixelPrice(existingPixel?.timestamp || null);
-				const isNew = !existingPixel;
-				let existingPixelAge;
-
-				if (existingPixel) {
-					existingPixelAge = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
-				}
-
-				const previewPixel: PreviewPixel = {
-					x: lastAction.x,
-					y: lastAction.y,
-					color: lastAction.color,
-					isNew,
-					existingPixelAge,
-					cost
+				const previewPixel: PixelData = {
+					x: lastAction.pixel.x,
+					y: lastAction.pixel.y,
+					color: lastAction.pixel.color
 				};
-
 				this.previewState.pixels.set(pixelKey, previewPixel);
 				this.updateCostBreakdown();
 			}
@@ -226,12 +199,14 @@ class State {
 			isActive: false,
 			pixels: new Map(),
 			costBreakdown: {
-				newPixels: 0,
-				freshPixels: 0,
-				recentPixels: 0,
-				olderPixels: 0,
-				ancientPixels: 0,
-				totalCost: 0
+				totalSats: 0,
+				pixelCounts: {
+					new: 0,
+					fresh: 0,
+					recent: 0,
+					older: 0,
+					ancient: 0
+				}
 			},
 			isDragging: false,
 			dragOffset: { x: 0, y: 0 },
@@ -242,19 +217,10 @@ class State {
 
 	addPreviewPixel(x: number, y: number, color: string) {
 		const pixelKey = `${x},${y}`;
-		const existingPixel = this.pixels.get(pixelKey);
 		const wasInPreview = this.previewState.pixels.has(pixelKey);
 
-		const cost = getPixelPrice(existingPixel?.timestamp || null);
-		const isNew = !existingPixel;
-		let existingPixelAge;
-
-		if (existingPixel) {
-			existingPixelAge = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
-		}
-
-		const previewPixel: PreviewPixel = {
-			x, y, color, isNew, existingPixelAge, cost
+		const previewPixel: PixelData = {
+			x, y, color
 		};
 
 		this.previewState.pixels.set(pixelKey, previewPixel);
@@ -263,7 +229,9 @@ class State {
 		// Add to undo history only if it's a new action (not already in preview)
 		if (!wasInPreview) {
 			this.addToUndoHistory({
-				x, y, action: 'add', color, timestamp: Date.now()
+				action: 'add',
+				pixel: previewPixel,
+				timestamp: Date.now()
 			});
 		}
 	}
@@ -278,7 +246,9 @@ class State {
 
 			// Store the removed pixel's color so we can restore it
 			this.addToUndoHistory({
-				x, y, action: 'remove', color: existingPreviewPixel.color, timestamp: Date.now()
+				action: 'remove',
+				pixel: existingPreviewPixel,
+				timestamp: Date.now()
 			});
 		}
 	}
@@ -291,19 +261,19 @@ class State {
 	}
 
 	updateCostBreakdown() {
-		const breakdown = calculateCostBreakdown(this.previewState.pixels);
+		const breakdown = nostrService.canvas.calculateCost(Array.from(this.previewState.pixels.values()));
 		this.updatePreviewState({ costBreakdown: breakdown });
 	}
 
-	// Method to track pixel changes
-	markPixelAsModified(x: number, y: number) {
-		const pixelKey = `${x},${y}`;
+	setPixel(pixel: PixelData) {
+		const pixelKey = `${pixel.x},${pixel.y}`;
+		this.pixels.set(pixelKey, pixel);
 		this.modifiedPixels.add(pixelKey);
 	}
 
-	// Method to mark all pixels for redraw (e.g., debug mode loading)
-	markAllPixelsForRedraw() {
-		this.modifiedPixels = new Set(this.pixels.keys());
+	setPixels(pixels: Map<string, PixelData>) {
+		this.pixels = pixels;
+		this.modifiedPixels = new Set(pixels.keys());
 	}
 }
 

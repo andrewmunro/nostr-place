@@ -7,7 +7,6 @@ import { calculateCostBreakdown, getPixelPrice, PreviewPixel } from './pricing';
 import { CanvasEventCallbacks, CostBreakdown, NostrClientConfig, PixelEvent, RelayConnection } from './types';
 
 export class NostrCanvas extends NostrClient {
-	private client: NostrClient;
 	private callbacks: CanvasEventCallbacks;
 	private codec: PixelCodec;
 	private pixels: Map<string, PixelEvent> = new Map();
@@ -17,11 +16,11 @@ export class NostrCanvas extends NostrClient {
 		super(fullConfig);
 
 		this.callbacks = callbacks;
-		this.codec = new PixelCodec(LIGHTNING_CONFIG.PUBKEY, config.relays);
+		this.codec = new PixelCodec(LIGHTNING_CONFIG.PUBKEY, this.config.relays);
 	}
 
 	async initialize(): Promise<void> {
-		await this.client.connect();
+		await this.connect();
 		await this.fetchHistoricalEvents();
 		this.subscribeToRealTimeEvents();
 	}
@@ -45,7 +44,7 @@ export class NostrCanvas extends NostrClient {
 
 		while (true) {
 			const filter: Filter = {
-				kinds: [90001, 9735],
+				kinds: [90001],
 				limit: eventsPerPage,
 				until: currentUntil
 			};
@@ -90,7 +89,7 @@ export class NostrCanvas extends NostrClient {
 
 	private subscribeToRealTimeEvents(): void {
 		const filter: Filter = {
-			kinds: [90001, 9735],
+			kinds: [90001],
 			since: Math.floor(Date.now() / 1000)
 		};
 
@@ -107,7 +106,7 @@ export class NostrCanvas extends NostrClient {
 
 	private handlePixelEvent(event: NostrEvent): void {
 		if (event.kind !== 90001 && event.kind !== 9735) return;
-		if (event.tags.some(t => t[0] === 'app' && t[1] !== 'Zappy Place')) return; // TODO might not work if no app tag
+		if (!event.tags.some(t => t[0] === 'app' && t[1] === 'Zappy Place')) return;
 
 		const pixelEvent = this.codec.decodePixelEvent(event);
 
@@ -187,7 +186,7 @@ export class NostrCanvas extends NostrClient {
 	}
 
 	async disconnect(): Promise<void> {
-		await this.client.disconnect();
+		await this.disconnect();
 	}
 }
 
@@ -195,17 +194,18 @@ export class NostrCanvas extends NostrClient {
 export function createDefaultConfig(): NostrClientConfig {
 	return {
 		relays: [
-			'wss://relay.damus.io',
-			'wss://nos.lol',
 			'wss://relay.nostr.band',
-			'wss://offchain.pub'
+			'wss://relay.primal.net',
+			// 'wss://relay.damus.io',
+			// 'wss://nos.lol',
+			// 'wss://offchain.pub'
 		],
 		reconnectInterval: 5000, // 5 seconds
 		maxReconnectAttempts: 10,
 		pagination: {
 			eventsPerPage: 100,
 			requestDelay: 1000, // 1 second between pages
-			since: Math.floor(Date.now() / 1000) - 86400 * 30 // 30 days ago
+			since: Math.floor(Date.now() / 1000) - 86400 * 1 // 1 days ago
 		}
 	};
 } 

@@ -1,8 +1,7 @@
 import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
-import { formatCostBreakdown } from './pricing';
+import { nostrService } from './nostr';
 import { state } from './state';
-import { submitZapRequest } from './zap-service';
 
 // Color palette constants
 const COLORS_PER_ROW = 2;
@@ -145,12 +144,8 @@ async function handlePreviewSubmit() {
 		submitBtn.disabled = true;
 		submitBtn.textContent = 'Processing...';
 
-		// Convert preview pixels to array
-		const pixels = Array.from(state.previewState.pixels.values());
-		const totalAmountMsats = state.previewState.costBreakdown.totalCost;
-
-		// Import zap service functions and submit
-		await submitZapRequest(pixels, totalAmountMsats);
+		// Submit preview pixels using nostr service
+		await nostrService.submitPreviewPixels();
 
 		// If successful, exit preview mode
 		handlePreviewCancel();
@@ -168,7 +163,7 @@ async function handlePreviewSubmit() {
 		// Re-enable submit button
 		const submitBtn = document.getElementById('preview-submit')! as HTMLButtonElement;
 		submitBtn.disabled = false;
-		const totalSats = state.previewState.costBreakdown.totalCost / 1000;
+		const totalSats = state.previewState.costBreakdown.totalSats;
 		submitBtn.textContent = `⚡ Zap ${totalSats} sats`;
 	}
 }
@@ -193,11 +188,29 @@ function updatePreviewModeUI() {
 
 		// Update cost display
 		const breakdown = state.previewState.costBreakdown;
-		const totalSats = breakdown.totalCost / 1000;
+		const totalSats = breakdown.totalSats;
 		const pixelCount = state.previewState.pixels.size;
 
 		costSummary.textContent = `${pixelCount} pixel${pixelCount > 1 ? 's' : ''} • ${totalSats} sats`;
-		costDetails.textContent = formatCostBreakdown(breakdown);
+
+		// Format cost breakdown manually since we don't have the helper function
+		const parts: string[] = [];
+		if (breakdown.pixelCounts.new > 0) {
+			parts.push(`${breakdown.pixelCounts.new} new (${breakdown.pixelCounts.new} sat${breakdown.pixelCounts.new > 1 ? 's' : ''})`);
+		}
+		if (breakdown.pixelCounts.fresh > 0) {
+			parts.push(`${breakdown.pixelCounts.fresh} fresh (${breakdown.pixelCounts.fresh * 10} sats)`);
+		}
+		if (breakdown.pixelCounts.recent > 0) {
+			parts.push(`${breakdown.pixelCounts.recent} recent (${breakdown.pixelCounts.recent * 5} sats)`);
+		}
+		if (breakdown.pixelCounts.older > 0) {
+			parts.push(`${breakdown.pixelCounts.older} older (${breakdown.pixelCounts.older * 2} sats)`);
+		}
+		if (breakdown.pixelCounts.ancient > 0) {
+			parts.push(`${breakdown.pixelCounts.ancient} ancient (${breakdown.pixelCounts.ancient} sat${breakdown.pixelCounts.ancient > 1 ? 's' : ''})`);
+		}
+		costDetails.textContent = parts.length > 0 ? `${parts.join(', ')} = ${totalSats} sats total` : '';
 
 		// Enable submit button
 		submitBtn.disabled = false;
@@ -220,18 +233,6 @@ function updatePreviewModeUI() {
 	if (costModeToggle) {
 		costModeToggle.checked = state.previewState.showCostMode;
 	}
-}
-
-// Add a function to periodically update the UI
-export function startUIUpdateLoop() {
-	setInterval(() => {
-		if (state.previewState.isActive) {
-			updatePreviewModeUI();
-			updateActionButtons(); // Update undo button state in preview mode
-		} else {
-			updateActionButtons(); // Update undo button state when not in preview mode
-		}
-	}, 500); // Update every 500ms when in preview mode
 }
 
 // UI update functions

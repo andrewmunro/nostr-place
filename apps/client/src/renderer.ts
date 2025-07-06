@@ -1,7 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { screenToWorld } from './camera';
 import { PREVIEW_MODE, WORLD_SIZE } from './constants';
-import { getAgeCategory, getAgeCategoryColor } from './pricing';
 import { state } from './state';
 
 // Cache for reusable graphics objects
@@ -96,7 +95,7 @@ function updatePixelTexture() {
 	// Only update modified pixels for performance
 	state.modifiedPixels.forEach((pixelKey) => {
 		const pixel = state.pixels.get(pixelKey);
-		if (pixel && pixel.isValid) {
+		if (pixel) {
 			// Clear the specific pixel area first (in case pixel was removed)
 			state.pixelContext.clearRect(pixel.x, pixel.y, 1, 1);
 
@@ -152,7 +151,7 @@ function renderPreviewPixels() {
 
 	// Render each preview pixel
 	for (const previewPixel of state.previewState.pixels.values()) {
-		const { x, y, color, isNew, cost } = previewPixel;
+		const { x, y, color } = previewPixel;
 
 		// Skip pixels outside visible area
 		if (x < minX || x > maxX || y < minY || y > maxY) continue;
@@ -164,23 +163,22 @@ function renderPreviewPixels() {
 			previewPixelGraphics.endFill();
 		}
 
-		// Add border based on cost/type (only if cost mode is enabled)
+		// Add simple border for preview pixels (only if cost mode is enabled)
 		if (state.previewState.showCostMode) {
-			let borderColor = 0x000000; // Default black
-			let borderAlpha = 0.8;
+			const existingPixel = state.pixels.get(`${x},${y}`);
+			let borderColor = 0x00FF00; // Green for new pixels
 
-			if (isNew) {
-				borderColor = 0x00FF00; // Green for new pixels
-			} else {
-				// Color based on cost (age)
-				if (cost >= 10000) borderColor = 0xFF4444; // Red - expensive
-				else if (cost >= 5000) borderColor = 0xFF8800; // Orange - moderate
-				else if (cost >= 2000) borderColor = 0xFFAA00; // Yellow - cheap
-				else borderColor = 0x888888; // Gray - cheapest
+			if (existingPixel) {
+				// Color based on age for existing pixels being overwritten
+				const ageHours = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
+				if (ageHours < 1) borderColor = 0xFF4444; // Red - expensive (fresh)
+				else if (ageHours < 24) borderColor = 0xFF8800; // Orange - moderate (recent)
+				else if (ageHours < 168) borderColor = 0xFFAA00; // Yellow - cheap (older)
+				else borderColor = 0x888888; // Gray - cheapest (ancient)
 			}
 
 			// Draw border
-			previewPixelGraphics.lineStyle(2 / state.camera.scale, borderColor, borderAlpha);
+			previewPixelGraphics.lineStyle(2 / state.camera.scale, borderColor, 0.8);
 			previewPixelGraphics.drawRect(x, y, 1, 1);
 		}
 	}
@@ -222,8 +220,13 @@ function renderAgeIndicators() {
 
 			if (existingPixel && existingPixel.isValid) {
 				const ageHours = (Date.now() - existingPixel.timestamp) / (1000 * 60 * 60);
-				const ageCategory = getAgeCategory(ageHours);
-				const color = getAgeCategoryColor(ageCategory);
+
+				// Calculate age category color locally
+				let color: string;
+				if (ageHours < 1) color = '#FF4444';   // Red - expensive
+				else if (ageHours < 24) color = '#FF8800';  // Orange - moderate
+				else if (ageHours < 168) color = '#FFAA00';   // Yellow - cheap
+				else color = '#888888'; // Gray - cheapest
 
 				// Draw subtle age indicator (small corner mark)
 				const cornerSize = 0.2;

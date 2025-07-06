@@ -1,6 +1,5 @@
-import { Pixel } from '@zappy-place/nostr-client';
 import { PRESET_COLORS } from './constants';
-import { state } from './state';
+import { PixelData, state } from './state';
 
 export function isDebugMode(): boolean {
 	const urlParams = new URLSearchParams(window.location.search);
@@ -23,11 +22,12 @@ export function initDebugMode() {
 	}
 
 	// Load dummy pixels
-	state.setPixels(generateDummyPixels());
+	state.pixels = generateDummyPixels();
+	state.modifiedPixels = new Set(state.pixels.keys());
 }
 
-function generateDummyPixels(): Map<string, Pixel> {
-	const pixels = new Map<string, Pixel>();
+function generateDummyPixels(): Map<string, PixelData> {
+	const pixels = new Map<string, PixelData>();
 
 	// Create a test pattern inspired by the orange/white theme
 
@@ -77,18 +77,14 @@ function generateDummyPixels(): Map<string, Pixel> {
 	return pixels;
 }
 
-function drawBorder(pixels: Map<string, Pixel>, x: number, y: number, width: number, height: number, color: string) {
+function drawBorder(pixels: Map<string, PixelData>, x: number, y: number, width: number, height: number, color: string) {
 	for (let px = x; px < x + width; px++) {
 		for (let py = y; py < y + height; py++) {
 			if (px >= 0 && px < 2000 && py >= 0 && py < 2000) {
-				const pixel: Pixel = {
+				const pixel: PixelData = {
 					x: px,
 					y: py,
 					color,
-					eventId: `dummy_${px}_${py}_${Date.now()}`,
-					pubkey: 'dummy_user',
-					timestamp: Date.now(),
-					isValid: true
 				};
 				pixels.set(`${px},${py}`, pixel);
 			}
@@ -96,7 +92,7 @@ function drawBorder(pixels: Map<string, Pixel>, x: number, y: number, width: num
 	}
 }
 
-function drawSquareOutline(pixels: Map<string, Pixel>, x: number, y: number, size: number, color: string) {
+function drawSquareOutline(pixels: Map<string, PixelData>, x: number, y: number, size: number, color: string) {
 	// Top and bottom lines
 	for (let px = x; px < x + size; px++) {
 		setPixel(pixels, px, y, color);
@@ -109,7 +105,7 @@ function drawSquareOutline(pixels: Map<string, Pixel>, x: number, y: number, siz
 	}
 }
 
-function createCheckerboard(pixels: Map<string, Pixel>, x: number, y: number, width: number, height: number, color1: string, color2: string) {
+function createCheckerboard(pixels: Map<string, PixelData>, x: number, y: number, width: number, height: number, color1: string, color2: string) {
 	const squareSize = 20;
 	for (let px = 0; px < width; px++) {
 		for (let py = 0; py < height; py++) {
@@ -121,7 +117,7 @@ function createCheckerboard(pixels: Map<string, Pixel>, x: number, y: number, wi
 	}
 }
 
-function createGradient(pixels: Map<string, Pixel>, x: number, y: number, width: number, height: number) {
+function createGradient(pixels: Map<string, PixelData>, x: number, y: number, width: number, height: number) {
 	// Create a "gradient" effect using preset colors
 	for (let px = 0; px < width; px++) {
 		for (let py = 0; py < height; py++) {
@@ -136,7 +132,7 @@ function createGradient(pixels: Map<string, Pixel>, x: number, y: number, width:
 	}
 }
 
-function createRandomDots(pixels: Map<string, Pixel>, x: number, y: number, width: number, height: number) {
+function createRandomDots(pixels: Map<string, PixelData>, x: number, y: number, width: number, height: number) {
 	const numDots = 1000;
 	for (let i = 0; i < numDots; i++) {
 		const px = Math.floor(Math.random() * width);
@@ -146,7 +142,7 @@ function createRandomDots(pixels: Map<string, Pixel>, x: number, y: number, widt
 	}
 }
 
-function createTextPattern(pixels: Map<string, Pixel>, x: number, y: number, text: string) {
+function createTextPattern(pixels: Map<string, PixelData>, x: number, y: number, text: string) {
 	// Simple 5x7 font patterns for each letter
 	const letters: Record<string, number[][]> = {
 		'N': [
@@ -212,7 +208,7 @@ function createTextPattern(pixels: Map<string, Pixel>, x: number, y: number, tex
 	}
 }
 
-function drawLine(pixels: Map<string, Pixel>, x1: number, y1: number, x2: number, y2: number, color: string) {
+function drawLine(pixels: Map<string, PixelData>, x1: number, y1: number, x2: number, y2: number, color: string) {
 	const dx = Math.abs(x2 - x1);
 	const dy = Math.abs(y2 - y1);
 	const sx = x1 < x2 ? 1 : -1;
@@ -239,7 +235,7 @@ function drawLine(pixels: Map<string, Pixel>, x1: number, y1: number, x2: number
 	}
 }
 
-function drawCornerMarker(pixels: Map<string, Pixel>, x: number, y: number, color: string) {
+function drawCornerMarker(pixels: Map<string, PixelData>, x: number, y: number, color: string) {
 	// Draw a 20x20 filled square
 	for (let px = 0; px < 20; px++) {
 		for (let py = 0; py < 20; py++) {
@@ -248,16 +244,12 @@ function drawCornerMarker(pixels: Map<string, Pixel>, x: number, y: number, colo
 	}
 }
 
-function setPixel(pixels: Map<string, Pixel>, x: number, y: number, color: string) {
+function setPixel(pixels: Map<string, PixelData>, x: number, y: number, color: string) {
 	if (x >= 0 && x < 2000 && y >= 0 && y < 2000) {
-		const pixel: Pixel = {
+		const pixel: PixelData = {
 			x,
 			y,
 			color,
-			eventId: `dummy_${x}_${y}_${Date.now()}`,
-			pubkey: 'dummy_user',
-			timestamp: Date.now(),
-			isValid: true
 		};
 		pixels.set(`${x},${y}`, pixel);
 	}

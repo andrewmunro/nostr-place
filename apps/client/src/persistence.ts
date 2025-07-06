@@ -1,6 +1,12 @@
-import { decodePixels, encodePixels, PixelData } from './compression';
+import { decodePixels, encodePixels } from '@zappy-place/nostr-client';
 import { MAX_SCALE, MIN_SCALE } from './constants';
 import { state } from './state';
+
+interface PixelData {
+	x: number;
+	y: number;
+	color: string;
+}
 
 function throttle<T extends (...args: any[]) => void>(func: T, delay: number): T {
 	let lastCallTime = 0;

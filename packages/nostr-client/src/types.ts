@@ -11,12 +11,6 @@ export interface PixelEvent {
 	amount: number;
 	senderPubkey?: string;
 	timestamp?: number;
-	isValid?: boolean;
-}
-
-export interface ValidationResult {
-	isValid: boolean;
-	reason?: string;
 }
 
 export interface CanvasConfig {

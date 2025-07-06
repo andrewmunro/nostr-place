@@ -1,5 +1,4 @@
-import { createDefaultConfig, NostrClient, Pixel } from '@zappy-place/nostr-client';
-import { OPTIMSTIC_PIXELS_ENABLED } from './constants';
+import { NostrCanvas, NostrClientConfig, PixelEvent } from '@zappy-place/nostr-client';
 import { state } from './state';
 import { setConnectionStatus, setUserInfo } from './ui';
 
@@ -9,19 +8,16 @@ function isDebugMode(): boolean {
 }
 
 class NostrService {
-	private client: NostrClient;
-	private isInitialized = false;
+	canvas: NostrCanvas;
+	isInitialized = false;
 
-	constructor() {
-		const config = createDefaultConfig();
-
-		this.client = new NostrClient(config, {
-			onPixelUpdate: (pixel: Pixel) => {
+	constructor(config: Partial<NostrClientConfig> = {}) {
+		this.canvas = new NostrCanvas(config, {
+			onPixelEvent: (pixel: PixelEvent) => {
 				this.handlePixelUpdate(pixel);
 			},
 			onRelayStatus: (relay) => {
 				console.log(`Relay ${relay.url}: ${relay.status}`);
-				setConnectionStatus(`🌐 ${this.getConnectionStatus()}`);
 			},
 			onError: (error, context) => {
 				console.error(`Nostr error in ${context}:`, error);
@@ -36,18 +32,12 @@ class NostrService {
 		setConnectionStatus('🌐 Connecting...');
 
 		try {
-			// Connect to relays
 			console.log('Connecting to Nostr relays...');
-			await this.client.connect();
-
-			await this.client.fetchHistoricalEvents();
-
-			// Subscribe to canvas events
-			console.log('Subscribing to canvas events...');
-			await this.client.subscribeToCanvas();
+			await this.canvas.initialize();
 
 			this.isInitialized = true;
 			console.log('Nostr service initialized successfully');
+			setConnectionStatus('🌐 Connected');
 		} catch (error) {
 			console.error('Failed to initialize Nostr service:', error);
 			setConnectionStatus('❌ Connection failed');
@@ -55,96 +45,48 @@ class NostrService {
 		}
 	}
 
-	public handlePixelUpdate(pixel: Pixel): void {
-		// TODO temp hack to remove
-		pixel.isValid = true;
-
-		// Update local state
-		const pixelKey = `${pixel.x},${pixel.y}`;
-		state.pixels.set(pixelKey, pixel);
-
-		// Mark specific pixel as modified for efficient rendering
-		state.markPixelAsModified(pixel.x, pixel.y);
-
-		console.log(`Updated pixel at (${pixel.x}, ${pixel.y}): ${pixel.color}, isValid: ${pixel.isValid}`);
-	}
-
-	private dimColor(color: string): string {
-		// Convert hex color to dimmed version for pending pixels
-		if (color.startsWith('#')) {
-			const r = parseInt(color.slice(1, 3), 16);
-			const g = parseInt(color.slice(3, 5), 16);
-			const b = parseInt(color.slice(5, 7), 16);
-
-			// Dim by mixing with background color (make it 50% opacity effect)
-			const dimR = Math.floor(r * 0.5 + 255 * 0.5);
-			const dimG = Math.floor(g * 0.5 + 255 * 0.5);
-			const dimB = Math.floor(b * 0.5 + 255 * 0.5);
-
-			return `#${dimR.toString(16).padStart(2, '0')}${dimG.toString(16).padStart(2, '0')}${dimB.toString(16).padStart(2, '0')}`;
-		}
-		return color; // fallback for non-hex colors
-	}
-
-	async publishPixel(x: number, y: number, color: string, isUndo: boolean = false): Promise<void> {
-		const isDebug = isDebugMode();
-		let publicKey: string | null = null;
-
-		if (!isDebug) {
-			try {
-				publicKey = await window.nostr!.getPublicKey();
-			} catch (error) {
-				throw new Error('Please login to place pixels');
-			}
+	public handlePixelUpdate(pixelEvent: PixelEvent): void {
+		for (const pixel of pixelEvent.pixels) {
+			state.setPixel(pixel);
 		}
 
-		const pixel: Pixel = {
-			x,
-			y,
-			color,
-			eventId: `${x}_${y}_${Date.now()}`, // Temporary ID until real event comes back
-			pubkey: publicKey,
-			timestamp: Date.now(),
-		};
+		// Update preview costs if in preview mode
+		if (state.previewState.isActive) {
+			state.updateCostBreakdown();
+		}
+	}
+
+	// Submit preview pixels as a batch
+	async submitPreviewPixels(): Promise<void> {
+		if (!state.previewState.isActive || state.previewState.pixels.size === 0) {
+			throw new Error('No preview pixels to submit');
+		}
+
+		const pixelEvent: PixelEvent = {
+			pixels: Array.from(state.previewState.pixels.values()),
+			amount: state.previewState.costBreakdown.totalSats,
+		}
 
 		if (isDebugMode()) {
-			this.handlePixelUpdate(pixel);
+			this.handlePixelUpdate(pixelEvent);
+			state.exitPreviewMode();
 			return;
 		}
 
-		// Optimistically update local state immediately
-		if (OPTIMSTIC_PIXELS_ENABLED) {
-			// Update local state immediately for instant feedback
-			this.handlePixelUpdate({
-				...pixel,
-				color: this.dimColor(color)
-			});
-		}
-
 		try {
-			if (!this.isInitialized) {
-				throw new Error('Nostr service not initialized');
-			}
+			await this.canvas.publishPixelEvent(pixelEvent, true);
 
-			// Use the client's publishPixelEvent method which now uses window.nostr
-			const eventId = await this.client.publishPixelEvent(pixel);
-			console.log(`Published pixel event: ${eventId}`);
+			// Clear preview after successful submission
+			state.exitPreviewMode();
 		} catch (error) {
-			console.error('Failed to publish pixel:', error);
+			console.error('Failed to submit preview pixels:', error);
 			throw error;
 		}
 	}
 
-	getConnectionStatus(): string {
-		const relayStatuses = this.client.getRelayStatuses();
-		const connected = relayStatuses.filter(r => r.status === 'connected').length;
-		const total = relayStatuses.length;
-		return `${connected}/${total} relays connected`;
-	}
-
 	async disconnect(): Promise<void> {
 		if (this.isInitialized) {
-			await this.client.disconnect();
+			await this.canvas.disconnect();
 			this.isInitialized = false;
 		}
 		setConnectionStatus('🌐 Disconnected');
@@ -152,5 +94,4 @@ class NostrService {
 	}
 }
 
-// Export singleton instance
 export const nostrService = new NostrService(); 

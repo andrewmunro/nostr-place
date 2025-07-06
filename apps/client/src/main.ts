@@ -6,7 +6,7 @@ import { loadFromURL, updateURL } from './persistence';
 import { setupRenderer, updateRenderer } from './renderer';
 import { state } from './state';
 import './style.css';
-import { setupUI, setUserInfo, startUIUpdateLoop, updateUI } from './ui';
+import { setupUI, setUserInfo, updateUI } from './ui';
 
 // Update user info when authenticated
 document.addEventListener('nlAuth', async (e) => {
@@ -26,8 +26,7 @@ function updateLoop() {
 }
 
 // Initialize the application
-async function init() {
-
+async function initialize() {
 	console.log('Initializing Zappy Place...');
 	await setupRenderer();
 	setupUI();
@@ -35,9 +34,6 @@ async function init() {
 	loadFromURL();
 
 	state.app.ticker.add(updateLoop);
-
-	// Start the UI update loop for real-time preview updates
-	startUIUpdateLoop();
 
 	try {
 		// Check for debug mode
@@ -47,7 +43,6 @@ async function init() {
 			// Initialize Nostr connection
 			console.log('Connecting to Nostr...');
 			await nostrService.initialize();
-			console.log('🌐 Connection status:', nostrService.getConnectionStatus());
 		}
 
 		console.log('✅ Zappy Place ready!');
@@ -57,4 +52,4 @@ async function init() {
 }
 
 // Start the application
-init(); 
+initialize(); 
