@@ -60,11 +60,28 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
 
 ## ⚙️ Project Structure
 
-- `apps/client` – The React/PixiJS frontend.
-- `packages/nostr-canvas` - Package that handles the canvas state and Nostr events. Decoupled from the client to allow movement to a backend server at a later date.
+### Domain Boundaries
 
+**`packages/nostr-client`** - **Nostr Domain Layer**
+- **All Nostr communication**: connecting to relays, subscribing to events, publishing events
+- **Event encoding/decoding**: gzip + base64 compression for pixel data
+- **Age-based pricing**: calculating pixel costs based on age
+- **Zap request creation**: building kind 9734 zap request events
+- **Event validation**: validating incoming zap events and pixel data
+- **Canvas state management**: building canvas state from validated events
+- **Lightning integration**: handling LNURL-pay and WebLN payment flow
+
+**`apps/client`** - **Presentation Layer**
+- **Pixel rendering**: PixiJS-based canvas rendering
+- **UI interactions**: click handlers, preview mode, batch selection
+- **Camera/viewport**: zoom, pan, viewport management
+- **Input handling**: mouse/touch interactions for pixel placement
+- **Visual feedback**: preview mode, cost display, loading states
+- **State management**: UI state only (not business logic)
 
 ## 🖼️ Nostr Event Format
+
+*Note: This section documents the protocol specification. All event handling, encoding/decoding, and validation is implemented in the `@zappy-place/nostr-client` package.*
 
 ### 🧱 Batched Pixel Placement Zap Request (kind: 9734)
 ```json
@@ -89,90 +106,23 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
 - Compressed and encoded for efficient transmission
 - **Limit: 300 pixels per zap** to avoid size constraints
 
-### 🔧 Encoding/Decoding Process
-```javascript
-import pako from "pako";
+### 🔧 Implementation Details
 
-// Encode pixels for transmission
-function encodePixels(pixels) {
-  const payload = pixels.map(p => `${p.x},${p.y},${p.color}`).join('\n');
-  const compressed = pako.deflate(payload);
-  const base64 = btoa(String.fromCharCode(...compressed));
-  return base64;
-}
+All encoding/decoding, validation, and event handling is implemented in the `@zappy-place/nostr-client` package. The client app does not need to understand the Nostr protocol details - it only needs to:
 
-// Decode pixels from zap event
-function decodePixels(base64) {
-  const binary = atob(base64);
-  const byteArray = Uint8Array.from(binary, char => char.charCodeAt(0));
-  const decompressed = pako.inflate(byteArray, { to: 'string' });
-  
-  const lines = decompressed.trim().split('\n');
-  return lines.map(line => {
-    const [x, y, color] = line.split(',');
-    return { x: parseInt(x), y: parseInt(y), color };
-  });
-}
+1. **Submit pixels**: `await canvas.submitPixels(previewPixels)`
+2. **Receive pixel updates**: Handle the `onPixelUpdate` callback
+3. **Display costs**: Handle the `onCostUpdate` callback
 
-// Relay filter for pixel zaps
-const filter = {
-  kinds: [9734],
-  "#app": ["zappy-place"],
-  since: Math.floor(Date.now() / 86400) * 86400 // today
-};
+The nostr-client package handles:
+- Gzip compression and base64 encoding
+- Age-based pricing calculations
+- Event validation and filtering
+- Optimistic rendering with retroactive validation
+- Lightning payment integration
 
-// Age-based pricing validation
-function validateZapEvent(zapEvent, currentPixels) {
-  const pixels = decodePixels(zapEvent.content);
-  const declaredAmount = parseInt(zapEvent.tags.find(t => t[0] === 'amount')[1]);
-  const zapTimestamp = zapEvent.created_at * 1000;
-  
-  let expectedAmount = 0;
-  for (const pixel of pixels) {
-    const pixelKey = `${pixel.x},${pixel.y}`;
-    const existingPixel = currentPixels.get(pixelKey);
-    
-    if (!existingPixel) {
-      expectedAmount += 1000; // 1 sat for new pixels
-    } else {
-      // Calculate age-based pricing
-      const ageHours = (zapTimestamp - existingPixel.timestamp) / (1000 * 60 * 60);
-      expectedAmount += getAgePricing(ageHours);
-    }
-  }
-  
-  return declaredAmount === expectedAmount;
-}
-
-function getAgePricing(ageHours) {
-  if (ageHours < 1) return 10000;      // 10 sats (< 1 hour)
-  if (ageHours < 24) return 5000;      // 5 sats (1-24 hours)
-  if (ageHours < 168) return 2000;     // 2 sats (1-7 days)
-  return 1000;                         // 1 sat (> 1 week)
-}
-
-// Optimistic rendering with retroactive validation
-function handleIncomingEvent(zapEvent) {
-  // 1. Immediately render pixels for instant feedback
-  renderPixelsOptimistically(zapEvent);
-  
-  // 2. Queue for validation as historical data becomes available
-  queueForValidation(zapEvent);
-  
-  // 3. Remove if validation fails
-  validateEventAsync(zapEvent).then(isValid => {
-    if (!isValid) {
-      removeInvalidPixels(zapEvent);
-      console.log(`Removed invalid event: ${zapEvent.id}`);
-    } else {
-      markPixelsAsConfirmed(zapEvent);
-    }
-  });
-}
-```
-
-## ✅ Validation Rules (Client-Side)
-When reconstructing the canvas:
+## ✅ Validation Rules (nostr-client Package)
+*These validation rules are implemented in the `@zappy-place/nostr-client` package:*
 
 1. Only accept `kind: 9734` zap request events with pixel data
 	- Must contain `["app", "zappy-place"]` tag
@@ -201,37 +151,51 @@ When reconstructing the canvas:
 	- Later timestamp wins (most recent zap)
 	- Validate bolt11 invoice amount matches declared amount
 
-## Business logic
+## Business Logic Flow
 
-1. **Canvas Loading:**  
-   The user loads the canvas which displays all existing pixels from validated zap events.
+### Client App Responsibilities
 
-2. **Preview Mode:**  
-   When the user starts placing pixels, the canvas enters preview mode:
-   - Existing pixels are dimmed to highlight the user's work
-   - A detailed cost breakdown shows pricing by category (new, fresh, recent, old, ancient)
-   - Smart relocation tool allows dragging the entire design to find cheaper areas
-   - Visual age indicators help identify expensive vs cheap placement zones
-   - User can place multiple pixels before submitting
+1. **Canvas Loading & Rendering:**  
+   - Initialize PixiJS canvas and camera system
+   - Subscribe to pixel updates from nostr-client package
+   - Render pixels received via `onPixelUpdate` callback
 
-3. **Batch Submission:**  
-   Once satisfied with their design, the user clicks submit:
-   - Creates a single `kind: 9734` zap request with compressed pixel data
-   - Zap amount equals sum of pixel prices (age-based pricing)
-   - All pixels are gzip-compressed and base64-encoded in the content field
-   - Maximum 300 pixels per batch to avoid size limits
+2. **Preview Mode (UI Layer):**  
+   - Detect pixel placement clicks and enter preview mode
+   - Dim existing pixels to highlight user's work
+   - Display cost breakdown received from `onCostUpdate` callback
+   - Handle smart relocation tool for dragging designs
+   - Show visual age indicators for placement cost zones
+   - Allow multiple pixel placement before submission
 
-4. **Client-side validation:**  
-   The app listens for `kind: 9734` zap request events and validates each:
-   - Decompresses and parses pixel data from content field
-   - Zap amount must match sum of pixel prices (age-based validation)
-   - All pixel coordinates must be within canvas bounds
-   - Colors must be valid hex format
+3. **Batch Submission (UI Trigger):**  
+   - Collect preview pixels from UI state
+   - Call `await canvas.submitPixels(previewPixels)` 
+   - Handle loading states and error feedback
+   - Clear preview mode after successful submission
 
-5. **Pixel rendering (Optimistic):**  
-   Pixels are rendered immediately for instant feedback:
-   - Render pixels as soon as zap events are received
-   - Mark pixels as "temporary" until validation completes
-   - Remove invalid pixels if validation fails with historical data
-   - Visual indicators distinguish confirmed vs temporary pixels
-   - Handle conflicts by timestamp (latest wins)
+4. **Visual Feedback:**  
+   - Display loading spinners during submissions
+   - Show success/error messages
+   - Handle optimistic vs confirmed pixel rendering
+   - Manage viewport, zoom, and camera controls
+
+### nostr-client Package Responsibilities
+
+1. **Canvas State Management:**  
+   - Listen for `kind: 9734` zap request events
+   - Validate and decode pixel data from events
+   - Maintain canonical canvas state from blockchain
+   - Calculate age-based pricing for pixel overwrites
+
+2. **Event Processing:**  
+   - Compress pixel data using gzip + base64
+   - Create properly formatted zap request events
+   - Handle Lightning payment flow (LNURL-pay + WebLN)
+   - Validate event amounts match pixel pricing
+
+3. **Optimistic Rendering:**  
+   - Immediately notify client of new pixels via `onPixelUpdate`
+   - Queue events for validation as historical data loads
+   - Remove invalid pixels and notify client if validation fails
+   - Handle pixel conflicts by timestamp (latest wins)

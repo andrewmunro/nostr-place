@@ -1,5 +1,23 @@
 # Cursor Rules for Zappy Place Project
 
+## Domain Boundaries (CRITICAL)
+
+### packages/nostr-client - Nostr Domain Layer
+- **OWNS**: All Nostr communication, event encoding/decoding, age-based pricing, zap request creation, event validation, canvas state management, Lightning integration
+- **NEVER**: Handle UI rendering, PixiJS operations, input handling, camera/viewport management
+- **EXPORTS**: Clean interfaces for client app to consume (NostrCanvas, callbacks, types)
+
+### apps/client - Presentation Layer  
+- **OWNS**: Pixel rendering (PixiJS), UI interactions, camera/viewport, input handling, visual feedback, UI state management
+- **NEVER**: Import nostr-tools directly, handle event encoding/decoding, calculate pricing, manage relay connections, validate Nostr events, handle Lightning payments directly
+- **USES**: Only interfaces exported by @zappy-place/nostr-client package
+
+### Domain Boundary Rules
+- Client app communicates with nostr-client package ONLY through exported interfaces
+- NO direct imports of nostr-tools, pako, or other protocol libraries in client app
+- ALL business logic (pricing, validation, encoding) belongs in nostr-client package
+- Client app focuses purely on presentation and user interactions
+
 ## Commit Messages
 Keep commit messages short and concise.
 
@@ -34,6 +52,11 @@ Keep commit messages short and concise.
 - Always handle errors gracefully
 - Provide meaningful error messages
 - Use proper TypeScript error types
+
+## Development Server
+- DO NOT run the development server (`npm start`, `vite`, etc.) unless explicitly requested
+- The user is likely running their own development server
+- Only run build commands when necessary for testing compilation
 
 ## Best Practices
 - Don't create unnecessary files
