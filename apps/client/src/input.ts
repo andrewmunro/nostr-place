@@ -96,6 +96,7 @@ function checkCenterPixelTooltip() {
 
 // Hammer.js gesture handlers
 function handlePanStart(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	// Handle pan for both single finger and during pinch
 	state.updatePointerState({
 		isDragging: true,
@@ -107,6 +108,7 @@ function handlePanStart(event: HammerInput) {
 }
 
 function handlePanMove(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	// Handle pan for both single finger and during pinch
 	if (state.pointerState.isDragging) {
 		const dx = event.center.x - state.pointerState.lastPos.x;
@@ -127,6 +129,7 @@ function handlePanMove(event: HammerInput) {
 }
 
 function handlePanEnd(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	// Only stop panning when all fingers are lifted
 	if (event.pointers.length === 0) {
 		state.updatePointerState({ isDragging: false });
@@ -139,6 +142,7 @@ function handlePanEnd(event: HammerInput) {
 let pinchStartData: { scale: number; center: { x: number; y: number }; lastCenter: { x: number; y: number } } | null = null;
 
 function handlePinchStart(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	pinchStartData = {
 		scale: state.camera.scale,
 		center: { x: event.center.x, y: event.center.y },
@@ -149,6 +153,7 @@ function handlePinchStart(event: HammerInput) {
 }
 
 function handlePinchMove(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	if (!pinchStartData) return;
 
 	const currentCenter = { x: event.center.x, y: event.center.y };
@@ -191,12 +196,14 @@ function handlePinchMove(event: HammerInput) {
 }
 
 function handlePinchEnd(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	pinchStartData = null;
 	// Check for tooltip on center pixel when pinching ends
 	checkCenterPixelTooltip();
 }
 
 function handleTap(event: HammerInput) {
+	if (event.pointerType !== 'touch') return;
 	// Handle tap for pixel placement (similar to mouse click)
 	if (state.selectedColor) {
 		const worldPos = screenToWorld(event.center.x, event.center.y);
