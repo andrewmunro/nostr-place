@@ -1,6 +1,10 @@
-# 🎨 zappy-place
+<div align="center">
+  <a href="https://zappy-place.pages.dev">
+    <img src="https://blossom.primal.net/b6850c80549f05eb5d84ab35421808d8cea0d6a496e2baad5a16dbb0ba565100.png " alt="Zappy Place" width="200" />
 
-A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Place — powered by [Nostr](https://nostr.com) and Lightning ⚡ Zaps.
+  <h1><b>🎨 zappy-place</b></h1>  </a>
+  <strong>A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Place — powered by <a href="https://nostr.com">Nostr</a></strong>
+</div>
 
 ## Inspiration
 
@@ -22,14 +26,14 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
 
 ## 🎨 User Experience
 
-### Preview Mode Workflow
-1. **Load Canvas** - View all existing pixels from the network
-2. **Start Placing** - Click pixels to enter preview mode
-3. **Design Preview** - Existing pixels dim, your pixels glow, cost counter updates
-4. **Cost Breakdown** - See detailed pricing: "2 new pixels (2 sats), 3 fresh pixels (30 sats), 1 old pixel (2 sats)"
-5. **Smart Relocation** - Drag your entire design to find cheaper placement areas
-6. **Submit Batch** - Click submit to zap and broadcast all pixels at once
-7. **Live Update** - Your pixels appear permanently as the zap is received
+### How it works
+- Pixels are drawn in a preview mode. Cost is calculated based on the pricing structure below.
+- When you're happy with your design, you can submit it by clicking the submit button.
+  - You can optionally add a URL and message to your pixels to advertise whatever you like.
+- Zaps are sent to [pay@zappy-place.pages.dev](https://nostr.band/npub12kflsgh8vfj22w8usk4dpj8rw2umsktfcpyw38jfj07ndh8uzmvs0xente)
+- When the zap is received, the pixels are drawn on the canvas in real time.
+- All pixels are validated in chronological order.
+
 
 ### Cost Structure
 - **1 sat per new pixel** - Base pricing for empty spaces
@@ -38,7 +42,6 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
   - Recent pixels (1-24 hours): 5 sats to overwrite
   - Older pixels (1-7 days): 2 sats to overwrite
   - Ancient pixels (> 1 week): 1 sat to overwrite
-- **Batched payments** - One zap for multiple pixels reduces fees
 - **300 pixel limit** - Maximum pixels per batch to avoid size constraints
 - **Real-time cost tracking** - See total cost before submitting (varies by age)
 - **Cost breakdown display** - Detailed pricing explanation by pixel age categories
@@ -87,7 +90,7 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
 ```json
 {
   "kind": 9734,
-  "pubkey": "<zapper_pubkey>",
+  "pubkey": "<sender_pubkey>",
   "created_at": 1234567900,
   "content": "eJyrVkosLcmIz8nPS1WyUoLB+OTi/KLM9FQlKyVnv5BCK6W4oqiYoLSqYnGcmJAUhIwB",
   "tags": [
@@ -96,6 +99,8 @@ A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Plac
     ["app", "zappy-place"],
     ["encoding", "gzip+base64:v1"],
     ["amount", "15000"]                  // Total msat value (varies by pixel age: 1 new + 2 fresh overwrites)
+	["message", "<message>"],
+	["url", "<url>"]
   ]
 }
 ```
@@ -150,52 +155,3 @@ The nostr-client package handles:
 6. Handle pixel conflicts (same coordinate)
 	- Later timestamp wins (most recent zap)
 	- Validate bolt11 invoice amount matches declared amount
-
-## Business Logic Flow
-
-### Client App Responsibilities
-
-1. **Canvas Loading & Rendering:**  
-   - Initialize PixiJS canvas and camera system
-   - Subscribe to pixel updates from nostr-client package
-   - Render pixels received via `onPixelUpdate` callback
-
-2. **Preview Mode (UI Layer):**  
-   - Detect pixel placement clicks and enter preview mode
-   - Dim existing pixels to highlight user's work
-   - Display cost breakdown received from `onCostUpdate` callback
-   - Handle smart relocation tool for dragging designs
-   - Show visual age indicators for placement cost zones
-   - Allow multiple pixel placement before submission
-
-3. **Batch Submission (UI Trigger):**  
-   - Collect preview pixels from UI state
-   - Call `await canvas.submitPixels(previewPixels)` 
-   - Handle loading states and error feedback
-   - Clear preview mode after successful submission
-
-4. **Visual Feedback:**  
-   - Display loading spinners during submissions
-   - Show success/error messages
-   - Handle optimistic vs confirmed pixel rendering
-   - Manage viewport, zoom, and camera controls
-
-### nostr-client Package Responsibilities
-
-1. **Canvas State Management:**  
-   - Listen for `kind: 9734` zap request events
-   - Validate and decode pixel data from events
-   - Maintain canonical canvas state from blockchain
-   - Calculate age-based pricing for pixel overwrites
-
-2. **Event Processing:**  
-   - Compress pixel data using gzip + base64
-   - Create properly formatted zap request events
-   - Handle Lightning payment flow (LNURL-pay + WebLN)
-   - Validate event amounts match pixel pricing
-
-3. **Optimistic Rendering:**  
-   - Immediately notify client of new pixels via `onPixelUpdate`
-   - Queue events for validation as historical data loads
-   - Remove invalid pixels and notify client if validation fails
-   - Handle pixel conflicts by timestamp (latest wins)
