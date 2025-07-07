@@ -6,7 +6,6 @@ export const DEFAULT_SCALE = 25;
 
 // Preview mode constants
 export const PREVIEW_MODE = {
-	MAX_PIXELS_PER_BATCH: 300,
 	PREVIEW_OPACITY: 1.0,
 	EXISTING_PIXEL_DIM: 0.3,
 };

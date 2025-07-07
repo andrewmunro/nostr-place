@@ -38,6 +38,7 @@
 			</div>
 
 			<div id="zoom-controls">
+				<button class="action-btn" id="upload-btn" title="Upload Image">🖼️</button>
 				<button class="zoom-btn" id="zoom-in">+</button>
 				<button class="zoom-btn" id="zoom-out">−</button>
 				<button class="action-btn" id="undo-btn" title="Undo">↶</button>
@@ -281,6 +282,49 @@
 				<div class="share-actions">
 					<button id="share-skip" class="preview-btn cancel-btn">Skip</button>
 					<button id="share-to-nostr" class="preview-btn submit-btn">Share to Nostr</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Image Upload Modal -->
+	<div id="upload-modal" class="upload-modal hidden">
+		<div class="upload-modal-content">
+			<div class="upload-modal-header">
+				<h2>📷 Upload Image</h2>
+				<button class="upload-modal-close" id="upload-modal-close">×</button>
+			</div>
+			<div class="upload-modal-body">
+				<div class="upload-area" id="upload-area">
+					<div class="upload-instructions">
+						<div class="upload-icon">📤</div>
+						<p>Drag & drop an image here or click to browse</p>
+						<small>Supports JPG, PNG, GIF • Max size: 5MB</small>
+					</div>
+					<input type="file" id="image-input" accept="image/*" hidden>
+				</div>
+
+				<div class="upload-preview hidden" id="upload-preview">
+					<div class="preview-image-container">
+						<img id="preview-image" src="" alt="Preview">
+					</div>
+					<div class="upload-settings">
+						<div class="setting-group">
+							<label for="image-size">Max Width/Height (pixels):</label>
+							<input type="range" id="image-size" min="8" max="200" value="64" step="1">
+							<span id="size-value">64</span>
+						</div>
+						<div class="setting-group">
+							<label class="checkbox-label">
+								<input type="checkbox" id="dither-enable" checked>
+								<span>Enable dithering (better quality)</span>
+							</label>
+						</div>
+					</div>
+					<div class="upload-actions">
+						<button id="upload-cancel" class="preview-btn cancel-btn">Cancel</button>
+						<button id="upload-convert" class="preview-btn submit-btn">Convert to Pixels</button>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -3,7 +3,6 @@ import { PixelData, PixelEvent, ValidationError } from './types';
 
 // Canvas configuration
 const WORLD_SIZE = 2000;
-const MAX_PIXELS_PER_BATCH = 300;
 
 export interface ValidationResult {
 	isValid: boolean;
@@ -13,7 +12,6 @@ export interface ValidationResult {
 // Export validation constants for use by client app
 export const VALIDATION_CONSTANTS = {
 	WORLD_SIZE,
-	MAX_PIXELS_PER_BATCH
 };
 
 // Helper function to get validation summary
@@ -91,12 +89,12 @@ export function validatePixelEvent(
 	}
 
 	// Check maximum pixels per batch
-	if (pixelEvent.pixels.length > MAX_PIXELS_PER_BATCH) {
-		errors.push({
-			type: 'TOO_MANY_PIXELS',
-			message: `Too many pixels in batch (${pixelEvent.pixels.length}). Maximum allowed: ${MAX_PIXELS_PER_BATCH}.`
-		});
-	}
+	// if (pixelEvent.pixels.length > MAX_PIXELS_PER_BATCH) {
+	// 	errors.push({
+	// 		type: 'TOO_MANY_PIXELS',
+	// 		message: `Too many pixels in batch (${pixelEvent.pixels.length}). Maximum allowed: ${MAX_PIXELS_PER_BATCH}.`
+	// 	});
+	// }
 
 	// Check timestamp validity
 	if (pixelEvent.timestamp && pixelEvent.timestamp > Math.floor(Date.now() / 1000) + 60) {

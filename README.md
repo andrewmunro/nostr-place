@@ -15,7 +15,7 @@
 ## 🚀 Features
 
 - 🧱 Canvas state is **derived from Nostr relays**
-- ⚡ **Batched pixel placement** - pay once for multiple pixels (up to 300)
+- ⚡ **Batched pixel placement** - pay once for multiple pixels
 - 🎨 **Smart preview mode** - see your design, cost breakdown, and relocate before submitting
 - 💰 **Age-based pricing** - Fresh pixels cost more to overwrite, encouraging collaboration
 - 🗜️ **Efficient compression** - gzip + base64 encoding for maximum pixels per event
@@ -42,7 +42,6 @@
   - Recent pixels (1-24 hours): 5 sats to overwrite
   - Older pixels (1-7 days): 2 sats to overwrite
   - Ancient pixels (> 1 week): 1 sat to overwrite
-- **300 pixel limit** - Maximum pixels per batch to avoid size constraints
 - **Real-time cost tracking** - See total cost before submitting (varies by age)
 - **Cost breakdown display** - Detailed pricing explanation by pixel age categories
 - **Smart relocation tool** - Drag entire designs to find cheaper placement areas
@@ -109,7 +108,6 @@
 - Raw format: `x,y,color\nx,y,color\n...` (newline-separated)
 - Example raw: `42,19,#ff0000\n43,19,#ff0000\n44,19,#00ff00`
 - Compressed and encoded for efficient transmission
-- **Limit: 300 pixels per zap** to avoid size constraints
 
 ### 🔧 Implementation Details
 
@@ -136,7 +134,6 @@ The nostr-client package handles:
 2. Decode and validate pixel data
 	- Decompress base64 + gzip content field
 	- Parse newline-separated `x,y,color` format
-	- Maximum 300 pixels per zap event
 3. Validate zap payment amount with age-based pricing
 	- New pixels: 1000 msats (1 sat)
 	- Overwriting pixels < 1 hour old: 10000 msats (10 sats)

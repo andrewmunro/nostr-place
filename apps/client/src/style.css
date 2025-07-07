@@ -1428,3 +1428,246 @@ body.preview-active.preview-minimized #color-palette-container {
 .pixel-modal-url a:hover {
 	text-decoration: underline;
 }
+
+/* Image Upload Modal Styles */
+.upload-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.8);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	pointer-events: auto;
+}
+
+.upload-modal.hidden {
+	display: none;
+}
+
+.upload-modal-content {
+	background: white;
+	border-radius: 12px;
+	padding: 0;
+	max-width: 600px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	position: relative;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+	animation: modalFadeIn 0.3s ease-out;
+}
+
+.upload-modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 24px 24px 16px;
+	border-bottom: 1px solid #eee;
+}
+
+.upload-modal-header h2 {
+	margin: 0;
+	color: #333;
+	font-size: 24px;
+}
+
+.upload-modal-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: #666;
+	padding: 0;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	transition: all 0.15s ease;
+}
+
+.upload-modal-close:hover {
+	background: #f0f0f0;
+	color: #333;
+}
+
+.upload-modal-body {
+	padding: 24px;
+}
+
+.upload-area {
+	border: 2px dashed #ddd;
+	border-radius: 8px;
+	padding: 40px 20px;
+	text-align: center;
+	background: #f8f9fa;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.upload-area:hover {
+	border-color: #007acc;
+	background: #f0f8ff;
+}
+
+.upload-area.dragover {
+	border-color: #007acc;
+	background: #e6f3ff;
+	transform: scale(1.02);
+}
+
+.upload-instructions {
+	color: #666;
+}
+
+.upload-icon {
+	font-size: 48px;
+	margin-bottom: 16px;
+}
+
+.upload-instructions p {
+	margin: 0 0 8px 0;
+	font-size: 18px;
+	font-weight: 500;
+}
+
+.upload-instructions small {
+	font-size: 14px;
+	color: #999;
+}
+
+.upload-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.preview-image-container {
+	display: flex;
+	justify-content: center;
+	padding: 16px;
+	background: #f8f9fa;
+	border-radius: 8px;
+	border: 1px solid #ddd;
+}
+
+.preview-image-container img {
+	max-width: 300px;
+	max-height: 300px;
+	border-radius: 4px;
+	image-rendering: auto;
+}
+
+.upload-settings {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.setting-group {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.setting-group label {
+	font-weight: 500;
+	color: #333;
+	font-size: 14px;
+}
+
+.setting-group input[type="range"] {
+	width: 100%;
+}
+
+.setting-group input[type="number"] {
+	padding: 8px 12px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	font-size: 14px;
+	width: 120px;
+}
+
+.setting-group input[type="number"]:focus {
+	outline: none;
+	border-color: #007acc;
+	box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+#size-value {
+	font-weight: bold;
+	color: #007acc;
+	font-size: 14px;
+}
+
+.checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+	margin: 0;
+}
+
+.upload-actions {
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+	margin-top: 24px;
+	padding-top: 24px;
+	border-top: 1px solid #eee;
+}
+
+.upload-actions .preview-btn {
+	margin-left: 0;
+	min-width: 120px;
+}
+
+/* Responsive adjustments for upload modal */
+@media (max-width: 768px) {
+	.upload-modal-content {
+		width: 95%;
+		margin: 20px;
+	}
+
+	.upload-modal-header {
+		padding: 16px;
+	}
+
+	.upload-modal-body {
+		padding: 16px;
+	}
+
+	.upload-area {
+		padding: 30px 15px;
+	}
+
+	.upload-icon {
+		font-size: 36px;
+	}
+
+	.upload-instructions p {
+		font-size: 16px;
+	}
+
+	.preview-image-container img {
+		max-width: 250px;
+		max-height: 250px;
+	}
+
+	.upload-actions {
+		flex-direction: column;
+	}
+
+	.upload-actions .preview-btn {
+		width: 100%;
+	}
+}

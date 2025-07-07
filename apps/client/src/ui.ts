@@ -1,7 +1,7 @@
 import { NostrProfile } from '@zappy-place/nostr-client';
 import { npubEncode } from 'nostr-tools/nip19';
 import { getCenterPixel, zoomIn, zoomOut } from './camera';
-import { PRESET_COLORS } from './constants';
+import { PRESET_COLORS, WORLD_SIZE } from './constants';
 import { nostrService } from './nostr';
 import { generateShareableURL } from './persistence';
 import { captureDesignScreenshot } from './renderer';
@@ -42,6 +42,7 @@ export function setupUI() {
 	setupPixelTooltip();
 	setupPixelModal();
 	setupShareModal();
+	setupUploadModal();
 
 	// Show tutorial for first-time users
 	if (isFirstTimeUser()) {
@@ -101,9 +102,14 @@ function setupZoomControls() {
 
 function setupActionControls() {
 	const undoBtn = document.getElementById('undo-btn')!;
+	const uploadBtn = document.getElementById('upload-btn')!;
 
 	undoBtn.addEventListener('click', () => {
 		state.undoLastAction();
+	});
+
+	uploadBtn.addEventListener('click', () => {
+		showUploadModal();
 	});
 }
 
@@ -803,4 +809,301 @@ export function showShareModal(pixelCoords: Array<{ x: number, y: number }>) {
 export function hideShareModal() {
 	const shareModal = document.getElementById('share-modal')!;
 	shareModal.classList.add('hidden');
+}
+
+// Image upload functionality
+function setupUploadModal() {
+	const uploadModal = document.getElementById('upload-modal')!;
+	const uploadModalClose = document.getElementById('upload-modal-close')!;
+	const uploadArea = document.getElementById('upload-area')!;
+	const imageInput = document.getElementById('image-input')! as HTMLInputElement;
+	const uploadCancel = document.getElementById('upload-cancel')!;
+	const uploadConvert = document.getElementById('upload-convert')! as HTMLButtonElement;
+	const imageSizeSlider = document.getElementById('image-size')! as HTMLInputElement;
+	const sizeValue = document.getElementById('size-value')!;
+
+	// Close modal handlers
+	uploadModalClose.addEventListener('click', hideUploadModal);
+	uploadCancel.addEventListener('click', hideUploadModal);
+
+	// Close modal when clicking outside
+	uploadModal.addEventListener('click', (event) => {
+		if (event.target === uploadModal) {
+			hideUploadModal();
+		}
+	});
+
+	// Close modal when pressing escape
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && !uploadModal.classList.contains('hidden')) {
+			hideUploadModal();
+		}
+	});
+
+	// Upload area click handler
+	uploadArea.addEventListener('click', () => {
+		imageInput.click();
+	});
+
+	// Drag and drop handlers
+	uploadArea.addEventListener('dragover', (event) => {
+		event.preventDefault();
+		uploadArea.classList.add('dragover');
+	});
+
+	uploadArea.addEventListener('dragleave', () => {
+		uploadArea.classList.remove('dragover');
+	});
+
+	uploadArea.addEventListener('drop', (event) => {
+		event.preventDefault();
+		uploadArea.classList.remove('dragover');
+
+		const files = event.dataTransfer?.files;
+		if (files && files.length > 0) {
+			handleImageFile(files[0]);
+		}
+	});
+
+	// File input change handler
+	imageInput.addEventListener('change', (event) => {
+		const target = event.target as HTMLInputElement;
+		if (target.files && target.files.length > 0) {
+			handleImageFile(target.files[0]);
+		}
+	});
+
+	// Size slider handler
+	imageSizeSlider.addEventListener('input', () => {
+		sizeValue.textContent = imageSizeSlider.value;
+	});
+
+	// Convert button handler
+	uploadConvert.addEventListener('click', async () => {
+		const previewImage = document.getElementById('preview-image')! as HTMLImageElement;
+		const maxSize = parseInt(imageSizeSlider.value);
+		const ditherEnable = (document.getElementById('dither-enable')! as HTMLInputElement).checked;
+
+		if (previewImage.src) {
+			try {
+				uploadConvert.disabled = true;
+				uploadConvert.textContent = 'Converting...';
+
+				await convertImageToPixels(previewImage, maxSize, ditherEnable);
+				hideUploadModal();
+			} catch (error) {
+				console.error('Failed to convert image:', error);
+				alert('Failed to convert image. Please try a different image.');
+			} finally {
+				uploadConvert.disabled = false;
+				uploadConvert.textContent = 'Convert to Pixels';
+			}
+		}
+	});
+}
+
+function showUploadModal() {
+	const uploadModal = document.getElementById('upload-modal')!;
+	const uploadArea = document.getElementById('upload-area')!;
+	const uploadPreview = document.getElementById('upload-preview')!;
+
+	// Reset modal state
+	uploadArea.classList.remove('hidden');
+	uploadPreview.classList.add('hidden');
+
+	uploadModal.classList.remove('hidden');
+}
+
+function hideUploadModal() {
+	const uploadModal = document.getElementById('upload-modal')!;
+	uploadModal.classList.add('hidden');
+
+	// Reset file input
+	const imageInput = document.getElementById('image-input')! as HTMLInputElement;
+	imageInput.value = '';
+}
+
+function handleImageFile(file: File) {
+	// Validate file type
+	if (!file.type.startsWith('image/')) {
+		alert('Please select a valid image file.');
+		return;
+	}
+
+	// Validate file size (5MB limit)
+	if (file.size > 5 * 1024 * 1024) {
+		alert('Image file is too large. Please select an image smaller than 5MB.');
+		return;
+	}
+
+	const reader = new FileReader();
+	reader.onload = (event) => {
+		const previewImage = document.getElementById('preview-image')! as HTMLImageElement;
+		const uploadArea = document.getElementById('upload-area')!;
+		const uploadPreview = document.getElementById('upload-preview')!;
+
+		previewImage.src = event.target?.result as string;
+		uploadArea.classList.add('hidden');
+		uploadPreview.classList.remove('hidden');
+	};
+
+	reader.readAsDataURL(file);
+}
+
+// Color distance function for finding closest preset color
+function getClosestPresetColor(r: number, g: number, b: number): string {
+	let closestColor = PRESET_COLORS[0];
+	let minDistance = Infinity;
+
+	for (const color of PRESET_COLORS) {
+		const hex = color.replace('#', '');
+		const cr = parseInt(hex.substring(0, 2), 16);
+		const cg = parseInt(hex.substring(2, 4), 16);
+		const cb = parseInt(hex.substring(4, 6), 16);
+
+		// Calculate Euclidean distance in RGB space
+		const distance = Math.sqrt(
+			Math.pow(r - cr, 2) +
+			Math.pow(g - cg, 2) +
+			Math.pow(b - cb, 2)
+		);
+
+		if (distance < minDistance) {
+			minDistance = distance;
+			closestColor = color;
+		}
+	}
+
+	return closestColor;
+}
+
+// Floyd-Steinberg dithering function
+function ditherImageData(imageData: ImageData, width: number, height: number): ImageData {
+	const data = new Uint8ClampedArray(imageData.data);
+
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+			const index = (y * width + x) * 4;
+			const oldR = data[index];
+			const oldG = data[index + 1];
+			const oldB = data[index + 2];
+
+			// Find closest color
+			const closestColor = getClosestPresetColor(oldR, oldG, oldB);
+			const hex = closestColor.replace('#', '');
+			const newR = parseInt(hex.substring(0, 2), 16);
+			const newG = parseInt(hex.substring(2, 4), 16);
+			const newB = parseInt(hex.substring(4, 6), 16);
+
+			// Set new color
+			data[index] = newR;
+			data[index + 1] = newG;
+			data[index + 2] = newB;
+
+			// Calculate error
+			const errR = oldR - newR;
+			const errG = oldG - newG;
+			const errB = oldB - newB;
+
+			// Distribute error to neighboring pixels
+			const distributeError = (nx: number, ny: number, factor: number) => {
+				if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+					const ni = (ny * width + nx) * 4;
+					data[ni] = Math.max(0, Math.min(255, data[ni] + errR * factor));
+					data[ni + 1] = Math.max(0, Math.min(255, data[ni + 1] + errG * factor));
+					data[ni + 2] = Math.max(0, Math.min(255, data[ni + 2] + errB * factor));
+				}
+			};
+
+			distributeError(x + 1, y, 7 / 16);
+			distributeError(x - 1, y + 1, 3 / 16);
+			distributeError(x, y + 1, 5 / 16);
+			distributeError(x + 1, y + 1, 1 / 16);
+		}
+	}
+
+	return new ImageData(data, width, height);
+}
+
+async function convertImageToPixels(
+	img: HTMLImageElement,
+	maxSize: number,
+	enableDithering: boolean
+): Promise<void> {
+	// Create canvas for image processing
+	const canvas = document.createElement('canvas');
+	const ctx = canvas.getContext('2d')!;
+
+	// Calculate scaled dimensions while maintaining aspect ratio
+	const aspectRatio = img.naturalWidth / img.naturalHeight;
+	let width: number, height: number;
+
+	if (aspectRatio > 1) {
+		// Landscape image
+		width = Math.min(maxSize, img.naturalWidth);
+		height = Math.round(width / aspectRatio);
+	} else {
+		// Portrait or square image
+		height = Math.min(maxSize, img.naturalHeight);
+		width = Math.round(height * aspectRatio);
+	}
+
+	// Ensure minimum size
+	width = Math.max(1, width);
+	height = Math.max(1, height);
+
+	canvas.width = width;
+	canvas.height = height;
+
+	// Disable image smoothing for pixel art style
+	ctx.imageSmoothingEnabled = false;
+
+	// Draw image to canvas
+	ctx.drawImage(img, 0, 0, width, height);
+
+	// Get image data
+	let imageData = ctx.getImageData(0, 0, width, height);
+
+	// Apply dithering if enabled
+	if (enableDithering) {
+		imageData = ditherImageData(imageData, width, height);
+	}
+
+	// Enter preview mode if not already active
+	if (!state.previewState.isActive) {
+		state.enterPreviewMode();
+	}
+
+	// Use camera center as starting position
+	const centerX = Math.floor(state.camera.x - width / 2);
+	const centerY = Math.floor(state.camera.y - height / 2);
+
+	// Convert each pixel to preview pixel
+	const data = imageData.data;
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+			const index = (y * width + x) * 4;
+			const r = data[index];
+			const g = data[index + 1];
+			const b = data[index + 2];
+			const a = data[index + 3];
+
+			// Skip transparent pixels
+			if (a < 128) continue;
+
+			// Find closest preset color
+			const closestColor = enableDithering ?
+				`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}` :
+				getClosestPresetColor(r, g, b);
+
+			// Calculate world position
+			const worldX = centerX + x;
+			const worldY = centerY + y;
+
+			// Check bounds
+			if (worldX >= 0 && worldX < WORLD_SIZE && worldY >= 0 && worldY < WORLD_SIZE) {
+				state.addPreviewPixel(worldX, worldY, closestColor);
+			}
+		}
+	}
 }
