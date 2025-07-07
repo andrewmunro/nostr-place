@@ -1,3 +1,4 @@
+import * as Hammer from 'hammerjs';
 import * as PIXI from 'pixi.js';
 import { getCenterPixel, screenToWorld, smoothZoomToPoint } from './camera';
 import { MAX_SCALE, MIN_SCALE, WORLD_SIZE } from './constants';
@@ -7,9 +8,13 @@ import { state } from './state';
 import { hidePixelTooltip, showPixelModal, showPixelTooltip } from './ui';
 
 // Touch control constants
-const TOUCH_HOLD_DURATION = 150; // milliseconds to hold for placing pixel
-const TOUCH_MOVE_THRESHOLD = 10; // pixels to move before canceling hold
-const PINCH_THRESHOLD = 10; // minimum distance change to start pinch
+const TOUCH_HOLD_DURATION = 400; // milliseconds to hold for placing pixel (increased for better UX)
+
+// Hammer.js instance
+let hammer: HammerManager | null = null;
+
+// Touch tooltip state
+let lastCenterPixelKey: string | null = null;
 
 export function setupInput() {
 	// Handle URL changes
@@ -24,70 +29,209 @@ export function setupInput() {
 	// Handle resize
 	window.addEventListener('resize', handleResize);
 
-	// Setup PIXI events
+	// Setup PIXI events for mouse interactions
 	state.app.stage.on('pointerdown', handlePointerDown);
 	state.app.stage.on('pointermove', handlePointerMove);
 	state.app.stage.on('pointerup', handlePointerUp);
 	state.app.stage.on('pointerupoutside', handlePointerUp);
 	state.app.stage.on('pointerleave', handlePointerLeave);
 	state.app.stage.on('wheel', handleWheel);
+
+	// Setup Hammer.js for touch gestures
+	setupHammerJS();
 }
 
-// Helper function to calculate distance between two points
-function calculateDistance(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
-	const dx = p2.x - p1.x;
-	const dy = p2.y - p1.y;
-	return Math.sqrt(dx * dx + dy * dy);
+function setupHammerJS() {
+	const canvas = state.app.view as HTMLCanvasElement;
+
+	// Create Hammer instance
+	hammer = new Hammer.Manager(canvas);
+
+	// Add recognizers
+	const pan = new Hammer.Pan({ direction: Hammer.DIRECTION_ALL, threshold: 0 });
+	const pinch = new Hammer.Pinch();
+	const tap = new Hammer.Tap();
+	const press = new Hammer.Press({ time: TOUCH_HOLD_DURATION });
+
+	// Add recognizers to manager
+	hammer.add([pan, pinch, tap, press]);
+
+	// Allow simultaneous recognition of pan and pinch
+	pinch.recognizeWith(pan);
+
+	// Set up gesture event listeners
+	hammer.on('panstart', handlePanStart);
+	hammer.on('panmove', handlePanMove);
+	hammer.on('panend', handlePanEnd);
+
+	hammer.on('pinchstart', handlePinchStart);
+	hammer.on('pinchmove', handlePinchMove);
+	hammer.on('pinchend', handlePinchEnd);
+
+	hammer.on('tap', handleTap);
+	hammer.on('press', handleTap);
 }
 
-// Helper function to calculate center point between two touches
-function calculateCenter(p1: { x: number; y: number }, p2: { x: number; y: number }): { x: number; y: number } {
-	return {
-		x: (p1.x + p2.x) / 2,
-		y: (p1.y + p2.y) / 2
+// Check and show tooltip for center pixel on touch devices
+function checkCenterPixelTooltip() {
+	const centerPixel = getCenterPixel();
+	const pixelKey = `${centerPixel.x},${centerPixel.y}`;
+
+	// Only update if center pixel has changed
+	if (pixelKey === lastCenterPixelKey) return;
+
+	lastCenterPixelKey = pixelKey;
+
+	// Check if this pixel has tooltip information
+	const pixelInfo = checkPixelHover(centerPixel.x, centerPixel.y);
+	if (pixelInfo && pixelInfo.message) {
+		// Show tooltip at center of screen for touch devices
+		const centerX = state.app.screen.width / 2;
+		const centerY = state.app.screen.height / 2;
+		showPixelTooltip(centerX, centerY, pixelInfo.message);
+	} else {
+		hidePixelTooltip();
+	}
+}
+
+// Hammer.js gesture handlers
+function handlePanStart(event: HammerInput) {
+	// Handle pan for both single finger and during pinch
+	state.updatePointerState({
+		isDragging: true,
+		lastPos: { x: event.center.x, y: event.center.y }
+	});
+	(state.app.view as HTMLCanvasElement).style.cursor = 'grabbing';
+	// Check for tooltip on center pixel when touch starts
+	checkCenterPixelTooltip();
+}
+
+function handlePanMove(event: HammerInput) {
+	// Handle pan for both single finger and during pinch
+	if (state.pointerState.isDragging) {
+		const dx = event.center.x - state.pointerState.lastPos.x;
+		const dy = event.center.y - state.pointerState.lastPos.y;
+
+		state.updateCamera({
+			x: state.camera.x - dx / state.camera.scale,
+			y: state.camera.y - dy / state.camera.scale
+		});
+
+		state.updatePointerState({
+			lastPos: { x: event.center.x, y: event.center.y }
+		});
+
+		// Check for tooltip on center pixel for touch devices
+		checkCenterPixelTooltip();
+	}
+}
+
+function handlePanEnd(event: HammerInput) {
+	// Only stop panning when all fingers are lifted
+	if (event.pointers.length === 0) {
+		state.updatePointerState({ isDragging: false });
+		(state.app.view as HTMLCanvasElement).style.cursor = 'default';
+		// Check for tooltip on center pixel when panning ends
+		checkCenterPixelTooltip();
+	}
+}
+
+let pinchStartData: { scale: number; center: { x: number; y: number }; lastCenter: { x: number; y: number } } | null = null;
+
+function handlePinchStart(event: HammerInput) {
+	pinchStartData = {
+		scale: state.camera.scale,
+		center: { x: event.center.x, y: event.center.y },
+		lastCenter: { x: event.center.x, y: event.center.y }
 	};
+
+	// Keep panning active during pinch for simultaneous pan and zoom
 }
 
-// Helper function to handle pinch gesture
-function handlePinchGesture() {
-	if (state.touchState.activeTouches.size !== 2) return;
+function handlePinchMove(event: HammerInput) {
+	if (!pinchStartData) return;
 
-	const touches = Array.from(state.touchState.activeTouches.values());
-	const currentDistance = calculateDistance(touches[0], touches[1]);
-	const currentCenter = calculateCenter(touches[0], touches[1]);
+	const currentCenter = { x: event.center.x, y: event.center.y };
 
-	if (!state.touchState.isPinching) {
-		// Start pinch if distance changed enough
-		const initialDistance = state.touchState.pinchStartDistance;
-		if (Math.abs(currentDistance - initialDistance) > PINCH_THRESHOLD) {
-			state.updateTouchState({
-				isPinching: true,
-				pinchCenter: currentCenter
-			});
-			// Cancel hold timer when pinching starts
-			cancelTouchHold();
-		}
-		return;
+	// Handle panning: check if center has moved since last frame
+	const dx = currentCenter.x - pinchStartData.lastCenter.x;
+	const dy = currentCenter.y - pinchStartData.lastCenter.y;
+
+	if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+		// Apply panning based on center movement
+		state.updateCamera({
+			x: state.camera.x - dx / state.camera.scale,
+			y: state.camera.y - dy / state.camera.scale
+		});
 	}
 
-	// Continue pinch gesture
-	const scale = currentDistance / state.touchState.pinchStartDistance;
-	const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, state.touchState.pinchStartScale * scale));
+	// Handle zooming
+	const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinchStartData.scale * event.scale));
 
-	// Get world position at pinch center before zoom
-	const worldPosBeforeZoom = screenToWorld(state.touchState.pinchCenter!.x, state.touchState.pinchCenter!.y);
+	// Get world position at current pinch center before zoom
+	const worldPosBeforeZoom = screenToWorld(currentCenter.x, currentCenter.y);
 
 	// Apply new scale
 	state.updateCamera({ scale: newScale });
 
-	// Get world position at pinch center after zoom
-	const worldPosAfterZoom = screenToWorld(state.touchState.pinchCenter!.x, state.touchState.pinchCenter!.y);
+	// Get world position at current pinch center after zoom
+	const worldPosAfterZoom = screenToWorld(currentCenter.x, currentCenter.y);
 
 	// Adjust camera position to keep the same world position under the pinch center
 	state.updateCamera({
 		x: state.camera.x + worldPosBeforeZoom.x - worldPosAfterZoom.x,
 		y: state.camera.y + worldPosBeforeZoom.y - worldPosAfterZoom.y
 	});
+
+	// Update last center for next frame
+	pinchStartData.lastCenter = currentCenter;
+
+	// Check for tooltip on center pixel for touch devices
+	checkCenterPixelTooltip();
+}
+
+function handlePinchEnd(event: HammerInput) {
+	pinchStartData = null;
+	// Check for tooltip on center pixel when pinching ends
+	checkCenterPixelTooltip();
+}
+
+function handleTap(event: HammerInput) {
+	// Handle tap for pixel placement (similar to mouse click)
+	if (state.selectedColor) {
+		const worldPos = screenToWorld(event.center.x, event.center.y);
+		const pixelX = Math.floor(worldPos.x);
+		const pixelY = Math.floor(worldPos.y);
+
+		if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
+			// Check if pixel modal should be shown first (for non-preview mode)
+			if (!state.previewState.isActive) {
+				const pixelInfo = checkPixelClick(worldPos.x, worldPos.y);
+				if (pixelInfo) {
+					// Prevent event propagation to avoid clicking modal buttons immediately
+					event.preventDefault();
+					event.srcEvent.preventDefault();
+					event.srcEvent.stopPropagation();
+
+					// Small delay to ensure the tap doesn't interfere with modal interaction
+					setTimeout(() => {
+						showPixelModal(pixelInfo.message, pixelInfo.url);
+					}, 50);
+					return;
+				}
+			}
+
+			// Enter preview mode if not already active
+			if (!state.previewState.isActive) {
+				state.enterPreviewMode();
+			}
+			togglePreviewPixel(pixelX, pixelY, state.selectedColor);
+			// Provide haptic feedback
+			if (navigator.vibrate) {
+				navigator.vibrate(1);
+			}
+		}
+	}
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -125,21 +269,25 @@ function handleKeyDown(event: KeyboardEvent) {
 			state.updateCamera({
 				y: state.camera.y - moveSpeed
 			});
+			checkCenterPixelTooltip();
 		} else if (event.key === 's' || event.key === 'S' || event.key === 'ArrowDown') {
 			event.preventDefault();
 			state.updateCamera({
 				y: state.camera.y + moveSpeed
 			});
+			checkCenterPixelTooltip();
 		} else if (event.key === 'a' || event.key === 'A' || event.key === 'ArrowLeft') {
 			event.preventDefault();
 			state.updateCamera({
 				x: state.camera.x - moveSpeed
 			});
+			checkCenterPixelTooltip();
 		} else if (event.key === 'd' || event.key === 'D' || event.key === 'ArrowRight') {
 			event.preventDefault();
 			state.updateCamera({
 				x: state.camera.x + moveSpeed
 			});
+			checkCenterPixelTooltip();
 		}
 	}
 
@@ -167,44 +315,10 @@ function handleKeyDown(event: KeyboardEvent) {
 	}
 }
 
-function startTouchHold(globalPos: { x: number; y: number }) {
-	// Only start hold for single touch
-	if (state.touchState.activeTouches.size !== 1) return;
-
-	// Clear any existing hold timer
-	if (state.touchState.holdTimer) {
-		clearTimeout(state.touchState.holdTimer);
-	}
-
-	state.updateTouchState({
-		touchStartPos: { x: globalPos.x, y: globalPos.y },
-		holdTimer: setTimeout(() => {
-			// Place pixel at center position in preview mode
-			const centerPixel = getCenterPixel();
-			if (centerPixel.x >= 0 && centerPixel.x < WORLD_SIZE && centerPixel.y >= 0 && centerPixel.y < WORLD_SIZE && state.selectedColor) {
-				// Enter preview mode if not already active
-				if (!state.previewState.isActive) {
-					state.enterPreviewMode();
-				}
-				togglePreviewPixel(centerPixel.x, centerPixel.y, state.selectedColor);
-				navigator?.vibrate(10);
-			}
-			state.updateTouchState({ holdTimer: null });
-		}, TOUCH_HOLD_DURATION)
-	});
-}
-
-function cancelTouchHold() {
-	if (state.touchState.holdTimer) {
-		clearTimeout(state.touchState.holdTimer);
-		state.updateTouchState({
-			holdTimer: null,
-			touchStartPos: null
-		});
-	}
-}
-
 function handlePointerDown(event: PIXI.FederatedPointerEvent) {
+	// Only handle mouse events now (touch events are handled by Hammer.js)
+	if (event.pointerType === 'touch') return;
+
 	const globalPos = event.global;
 
 	// Check if pixel modal should be shown first (for non-preview mode)
@@ -217,45 +331,7 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 		}
 	}
 
-	// Check if this is a touch event
-	const isTouch = event.pointerType === 'touch';
-
-	if (isTouch) {
-		// Prevent default touch behaviors that cause vibration
-		event.preventDefault();
-
-		// Mark that touch controls have been used
-		state.updateTouchState({ hasTouchBeenUsed: true });
-
-		// Track this touch
-		state.touchState.activeTouches.set(event.pointerId, { x: globalPos.x, y: globalPos.y });
-
-		if (state.touchState.activeTouches.size === 1) {
-			// Single touch: start camera panning and hold timer
-			state.updatePointerState({
-				isDragging: true,
-				lastPos: { x: globalPos.x, y: globalPos.y }
-			});
-			startTouchHold(globalPos);
-			(state.app.view as HTMLCanvasElement).style.cursor = 'grabbing';
-		} else if (state.touchState.activeTouches.size === 2) {
-			// Two touches: prepare for pinch gesture
-			const touches = Array.from(state.touchState.activeTouches.values());
-			const distance = calculateDistance(touches[0], touches[1]);
-
-			state.updateTouchState({
-				pinchStartDistance: distance,
-				pinchStartScale: state.camera.scale,
-				isPinching: false
-			});
-
-			// Stop camera panning when second touch starts
-			state.updatePointerState({ isDragging: false });
-			// Cancel hold timer when second touch starts
-			cancelTouchHold();
-			(state.app.view as HTMLCanvasElement).style.cursor = 'default';
-		}
-	} else if (event.button === 0) { // Left click (mouse)
+	if (event.button === 0) { // Left click (mouse)
 		// For mouse: place pixel at cursor position in preview mode
 		if (state.pointerState.mouseCursorPixel && state.selectedColor) {
 			const pixelX = state.pointerState.mouseCursorPixel.x;
@@ -279,36 +355,15 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 }
 
 function handlePointerMove(event: PIXI.FederatedPointerEvent) {
+	// Only handle mouse events now (touch events are handled by Hammer.js)
+	if (event.pointerType === 'touch') return;
+
 	const globalPos = event.global;
 
-	// Update touch position if it's a touch event
-	if (event.pointerType === 'touch' && state.touchState.activeTouches.has(event.pointerId)) {
-		// Prevent default touch behaviors
-		event.preventDefault();
-
-		state.touchState.activeTouches.set(event.pointerId, { x: globalPos.x, y: globalPos.y });
-
-		// Handle pinch gesture
-		if (state.touchState.activeTouches.size === 2) {
-			handlePinchGesture();
-			return; // Don't handle camera panning during pinch
-		}
-	}
-
-	if (state.pointerState.isDragging && state.touchState.activeTouches.size <= 1) {
-		// Handle camera panning (only for single touch or mouse)
+	if (state.pointerState.isDragging) {
+		// Handle camera panning for mouse
 		const dx = globalPos.x - state.pointerState.lastPos.x;
 		const dy = globalPos.y - state.pointerState.lastPos.y;
-
-		// For touch: check if we've moved enough to cancel hold
-		if (state.touchState.holdTimer !== null && state.touchState.touchStartPos) {
-			const touchDx = Math.abs(globalPos.x - state.touchState.touchStartPos.x);
-			const touchDy = Math.abs(globalPos.y - state.touchState.touchStartPos.y);
-
-			if (touchDx > TOUCH_MOVE_THRESHOLD || touchDy > TOUCH_MOVE_THRESHOLD) {
-				cancelTouchHold();
-			}
-		}
 
 		state.updateCamera({
 			x: state.camera.x - dx / state.camera.scale,
@@ -318,7 +373,7 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 		state.updatePointerState({
 			lastPos: { x: globalPos.x, y: globalPos.y }
 		});
-	} else if (event.pointerType !== 'touch') {
+	} else {
 		// Update mouse cursor position and coordinates display for mouse events
 		const worldPos = screenToWorld(globalPos.x, globalPos.y);
 		const pixelX = Math.floor(worldPos.x);
@@ -345,45 +400,18 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 }
 
 function handlePointerUp(event: PIXI.FederatedPointerEvent) {
-	// Remove touch from tracking
-	if (event.pointerType === 'touch') {
-		// Prevent default touch behaviors
-		event.preventDefault();
+	// Only handle mouse events now (touch events are handled by Hammer.js)
+	if (event.pointerType === 'touch') return;
 
-		state.touchState.activeTouches.delete(event.pointerId);
-
-		// Reset pinch state when no touches remain
-		if (state.touchState.activeTouches.size === 0) {
-			state.updateTouchState({
-				isPinching: false,
-				pinchStartDistance: 0,
-				pinchStartScale: 1,
-				pinchCenter: null
-			});
-		} else if (state.touchState.activeTouches.size === 1) {
-			// Back to single touch - resume camera panning
-			const remainingTouch = Array.from(state.touchState.activeTouches.values())[0];
-			state.updatePointerState({
-				isDragging: true,
-				lastPos: { x: remainingTouch.x, y: remainingTouch.y }
-			});
-			(state.app.view as HTMLCanvasElement).style.cursor = 'grabbing';
-		}
-	}
-
-	// Cancel touch hold if active and no touches remain
-	if (state.touchState.activeTouches.size === 0) {
-		cancelTouchHold();
-	}
-
-	// Stop dragging if no touches remain or it's a mouse event
-	if (state.touchState.activeTouches.size === 0 || event.pointerType !== 'touch') {
-		state.updatePointerState({ isDragging: false });
-		(state.app.view as HTMLCanvasElement).style.cursor = 'default';
-	}
+	// Stop dragging for mouse events
+	state.updatePointerState({ isDragging: false });
+	(state.app.view as HTMLCanvasElement).style.cursor = 'default';
 }
 
 function handlePointerLeave(event: PIXI.FederatedPointerEvent) {
+	// Only handle mouse events now (touch events are handled by Hammer.js)
+	if (event.pointerType === 'touch') return;
+
 	// Hide tooltip when mouse leaves canvas
 	hidePixelTooltip();
 
@@ -392,31 +420,9 @@ function handlePointerLeave(event: PIXI.FederatedPointerEvent) {
 		mouseCursorPixel: null
 	});
 
-	// Remove touch from tracking
-	if (event.pointerType === 'touch') {
-		state.touchState.activeTouches.delete(event.pointerId);
-
-		// Reset pinch state when no touches remain
-		if (state.touchState.activeTouches.size === 0) {
-			state.updateTouchState({
-				isPinching: false,
-				pinchStartDistance: 0,
-				pinchStartScale: 1,
-				pinchCenter: null
-			});
-		}
-	}
-
-	// Cancel touch hold if active and no touches remain
-	if (state.touchState.activeTouches.size === 0) {
-		cancelTouchHold();
-	}
-
-	// Stop dragging if no touches remain or it's a mouse event
-	if (state.touchState.activeTouches.size === 0 || event.pointerType !== 'touch') {
-		state.updatePointerState({ isDragging: false });
-		(state.app.view as HTMLCanvasElement).style.cursor = 'crosshair';
-	}
+	// Stop dragging for mouse events
+	state.updatePointerState({ isDragging: false });
+	(state.app.view as HTMLCanvasElement).style.cursor = 'crosshair';
 }
 
 function handleWheel(event: PIXI.FederatedWheelEvent) {

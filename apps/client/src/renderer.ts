@@ -300,10 +300,6 @@ function renderCursor() {
 	if (state.pointerState.mouseCursorPixel) {
 		cursorPixelX = state.pointerState.mouseCursorPixel.x;
 		cursorPixelY = state.pointerState.mouseCursorPixel.y;
-	} else if (state.touchState.activeTouches.size > 0 || state.touchState.holdTimer !== null || state.touchState.hasTouchBeenUsed) {
-		// Show cursor at center for touch controls (when touches are active, during hold, or if touch has been used)
-		cursorPixelX = Math.floor(state.camera.x);
-		cursorPixelY = Math.floor(state.camera.y);
 	}
 
 	// Only show cursor if we have valid coordinates and pixel is within world bounds

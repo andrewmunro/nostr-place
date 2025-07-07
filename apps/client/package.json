@@ -10,9 +10,11 @@
 	},
 	"dependencies": {
 		"@zappy-place/nostr-client": "workspace:*",
+		"hammerjs": "^2.0.8",
 		"pixi.js": "^7.3.0"
 	},
 	"devDependencies": {
+		"@types/hammerjs": "^2.0.41",
 		"typescript": "^5.0.0",
 		"vite": "^4.4.0"
 	}

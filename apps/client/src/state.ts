@@ -19,18 +19,7 @@ export interface PointerState {
 	mouseCursorPixel: { x: number; y: number } | null;
 }
 
-export interface TouchState {
-	holdTimer: NodeJS.Timeout | null;
-	touchStartPos: { x: number; y: number } | null;
-	// Pinch gesture tracking
-	isPinching: boolean;
-	pinchStartDistance: number;
-	pinchStartScale: number;
-	pinchCenter: { x: number; y: number } | null;
-	activeTouches: Map<number, { x: number; y: number }>;
-	// Track if touch controls have been used
-	hasTouchBeenUsed: boolean;
-}
+
 
 export interface PixelAction {
 	action: 'add' | 'remove';
@@ -99,17 +88,7 @@ class State {
 		mouseCursorPixel: null
 	};
 
-	// Touch interaction state
-	touchState: TouchState = {
-		holdTimer: null,
-		touchStartPos: null,
-		isPinching: false,
-		pinchStartDistance: 0,
-		pinchStartScale: 1,
-		pinchCenter: null,
-		activeTouches: new Map(),
-		hasTouchBeenUsed: false
-	};
+
 
 	// Preview mode state
 	previewState: PreviewState = {
@@ -143,9 +122,7 @@ class State {
 		this.pointerState = { ...this.pointerState, ...updates };
 	}
 
-	updateTouchState(updates: Partial<TouchState>) {
-		this.touchState = { ...this.touchState, ...updates };
-	}
+
 
 	addToUndoHistory(action: PixelAction) {
 		this.undoHistory.push(action);
