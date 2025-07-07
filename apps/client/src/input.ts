@@ -440,20 +440,6 @@ function handleKeyDown(event: KeyboardEvent) {
 			event.preventDefault();
 			state.exitPreviewMode();
 			return;
-		} else if (event.key === 'Enter') {
-			event.preventDefault();
-			if (state.previewState.pixels.size > 0) {
-				// Trigger submit (same as clicking submit button)
-				const submitBtn = document.getElementById('preview-submit') as HTMLButtonElement;
-				if (submitBtn && !submitBtn.disabled) {
-					submitBtn.click();
-				}
-			}
-			return;
-		} else if (event.key === 'Delete' || event.key === 'Backspace') {
-			event.preventDefault();
-			state.clearPreviewPixels();
-			return;
 		}
 	}
 }
