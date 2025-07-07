@@ -90,6 +90,9 @@ class NostrService {
 		try {
 			await this.canvas.publishPixelEvent(pixelEvent, isFreePlacement());
 
+			// Add the submitted pixels to state immediately for screenshot capture
+			this.handlePixelUpdate(pixelEvent);
+
 			// Get pixel coordinates for sharing before clearing preview
 			const pixelCoords = Array.from(state.previewState.pixels.values()).map(p => ({ x: p.x, y: p.y }));
 

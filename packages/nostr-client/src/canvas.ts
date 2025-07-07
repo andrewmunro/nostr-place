@@ -1,3 +1,4 @@
+import { BlossomUploader } from '@nostrify/nostrify/uploaders';
 import { Filter, NostrEvent } from 'nostr-tools';
 import { NostrClient } from './client';
 import { PixelCodec } from './codec';
@@ -217,10 +218,42 @@ export class NostrCanvas extends NostrClient {
 			throw new Error('Nostr extension not available');
 		}
 
+		let finalContent = content;
+
+		// Upload image to Blossom server if provided
+		if (imageData) {
+			try {
+				// Convert base64 data URL to blob
+				const response = await fetch(imageData);
+				const blob = await response.blob();
+
+				// Create File from blob
+				const file = new File([blob], 'zappyplace-art.png', { type: 'image/png' });
+
+				// Upload to Blossom server using BlossomUploader
+				const uploader = new BlossomUploader({
+					servers: ['https://blossom.primal.net/'],
+					signer: window.nostr,
+				});
+
+				const tags = await uploader.upload(file);
+
+				// Extract the URL from the first tag
+				const imageUrl = tags[0][1];
+
+				// Add the image URL to the content
+				finalContent = `${content}\n\n${imageUrl}`;
+
+				console.log('Successfully uploaded image to Blossom server:', imageUrl);
+			} catch (error) {
+				console.error('Failed to upload image to Blossom server:', error);
+			}
+		}
+
 		const noteEvent: NostrEvent = {
 			kind: 1,
 			created_at: Math.floor(Date.now() / 1000),
-			content,
+			content: finalContent,
 			tags: [
 				['app', 'Zappy Place'],
 				['t', 'pixelart'],
@@ -231,11 +264,6 @@ export class NostrCanvas extends NostrClient {
 			id: '',
 			sig: ''
 		};
-
-		// Add image as a tag if provided
-		if (imageData) {
-			noteEvent.tags.push(['image', imageData]);
-		}
 
 		try {
 			const signedEvent = await window.nostr.signEvent(noteEvent);

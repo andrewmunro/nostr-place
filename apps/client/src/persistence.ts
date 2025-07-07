@@ -92,8 +92,8 @@ export function generateShareableURL(pixelCoords: Array<{ x: number, y: number }
 		const designHeight = maxY - minY + 1;
 		const maxDimension = Math.max(designWidth, designHeight);
 
-		// Aim for design to take up about 1/3 of screen (assuming ~800px screen)
-		const targetPixelSize = 250 / maxDimension;
+		// Aim for design to take up about half of screen (assuming ~800px common viewport)
+		const targetPixelSize = 400 / maxDimension;
 		scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, targetPixelSize));
 	}
 
