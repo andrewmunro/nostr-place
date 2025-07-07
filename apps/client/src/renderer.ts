@@ -256,10 +256,19 @@ function renderGrid() {
 		state.gridContainer.addChild(gridGraphics);
 	}
 
+	// Calculate grid opacity based on scale to prevent moire effect
+	let gridOpacity = 0.3; // Default opacity
+	if (state.camera.scale < 10) {
+		// Fade out grid between scale 2-10 to reduce moire effect
+		// At scale 2: opacity = 0
+		// At scale 10: opacity = 0.3
+		gridOpacity = Math.max(0, (state.camera.scale - 2) / 8 * 0.3);
+	}
+
 	// Show and clear the graphics
 	gridGraphics.visible = true;
 	gridGraphics.clear();
-	gridGraphics.lineStyle(1 / state.camera.scale, 0x888888, 0.3);
+	gridGraphics.lineStyle(1 / state.camera.scale, 0x888888, gridOpacity);
 
 	// Calculate visible area
 	const topLeft = screenToWorld(0, 0);
