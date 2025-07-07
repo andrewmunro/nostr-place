@@ -34,6 +34,17 @@ let previewDragState: PreviewDragState = {
 	lastAppliedOffset: { x: 0, y: 0 }
 };
 
+// Paint dragging state for continuous pixel placement
+interface PaintDragState {
+	isDragging: boolean;
+	lastPixel: { x: number; y: number } | null;
+}
+
+let paintDragState: PaintDragState = {
+	isDragging: false,
+	lastPixel: null
+};
+
 // Helper functions for preview pixel dragging
 function startPreviewDrag(screenX: number, screenY: number) {
 	if (!state.previewState.isActive || state.previewState.pixels.size === 0) {
@@ -118,6 +129,110 @@ function finishPreviewDrag() {
 	return { wasDragging, hasMoved };
 }
 
+// Helper functions for paint dragging
+function startPaintDrag(screenX: number, screenY: number): boolean {
+	if (!state.selectedColor) {
+		return false;
+	}
+
+	const worldPos = screenToWorld(screenX, screenY);
+	const pixelX = Math.floor(worldPos.x);
+	const pixelY = Math.floor(worldPos.y);
+
+	// Check if the position is within bounds
+	if (pixelX < 0 || pixelX >= WORLD_SIZE || pixelY < 0 || pixelY >= WORLD_SIZE) {
+		return false;
+	}
+
+	// Enter preview mode if not already active
+	if (!state.previewState.isActive) {
+		state.enterPreviewMode();
+	}
+
+	paintDragState = {
+		isDragging: true,
+		lastPixel: { x: pixelX, y: pixelY }
+	};
+
+	// Place the first pixel
+	state.addPreviewPixel(pixelX, pixelY, state.selectedColor);
+	return true;
+}
+
+function updatePaintDrag(screenX: number, screenY: number): boolean {
+	if (!paintDragState.isDragging || !state.selectedColor) {
+		return false;
+	}
+
+	const worldPos = screenToWorld(screenX, screenY);
+	const pixelX = Math.floor(worldPos.x);
+	const pixelY = Math.floor(worldPos.y);
+
+	// Check if the position is within bounds
+	if (pixelX < 0 || pixelX >= WORLD_SIZE || pixelY < 0 || pixelY >= WORLD_SIZE) {
+		return true; // Still dragging, just outside bounds
+	}
+
+	// Only place pixel if we've moved to a different pixel position
+	if (!paintDragState.lastPixel ||
+		paintDragState.lastPixel.x !== pixelX ||
+		paintDragState.lastPixel.y !== pixelY) {
+
+		// Draw a line of pixels from last position to current position
+		if (paintDragState.lastPixel) {
+			drawPixelLine(paintDragState.lastPixel.x, paintDragState.lastPixel.y, pixelX, pixelY, state.selectedColor);
+		} else {
+			// First pixel
+			state.addPreviewPixel(pixelX, pixelY, state.selectedColor);
+		}
+
+		paintDragState.lastPixel = { x: pixelX, y: pixelY };
+	}
+
+	return true;
+}
+
+function finishPaintDrag(): boolean {
+	const wasDragging = paintDragState.isDragging;
+	paintDragState = {
+		isDragging: false,
+		lastPixel: null
+	};
+	return wasDragging;
+}
+
+// Helper function to draw a line of pixels between two points using Bresenham's algorithm
+function drawPixelLine(x0: number, y0: number, x1: number, y1: number, color: string) {
+	const dx = Math.abs(x1 - x0);
+	const dy = Math.abs(y1 - y0);
+	const sx = x0 < x1 ? 1 : -1;
+	const sy = y0 < y1 ? 1 : -1;
+	let err = dx - dy;
+
+	let x = x0;
+	let y = y0;
+
+	while (true) {
+		// Place pixel if within bounds
+		if (x >= 0 && x < WORLD_SIZE && y >= 0 && y < WORLD_SIZE) {
+			state.addPreviewPixel(x, y, color);
+		}
+
+		// Check if we've reached the end point
+		if (x === x1 && y === y1) break;
+
+		const e2 = 2 * err;
+		if (e2 > -dy) {
+			err -= dy;
+			x += sx;
+		}
+		if (e2 < dx) {
+			err += dx;
+			y += sy;
+		}
+	}
+}
+
 export function setupInput() {
 	// Handle URL changes
 	window.addEventListener('hashchange', loadFromURL);
@@ -200,12 +315,20 @@ async function checkCenterPixelTooltip() {
 function handlePanStart(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
 
-	// Try to start preview pixel dragging first
+	// Try to start preview pixel dragging first (highest priority)
 	if (startPreviewDrag(event.center.x, event.center.y)) {
 		return;
 	}
 
-	// Handle pan for camera movement
+	// Disable paint dragging for now on touch.
+	// // Try paint dragging next if we have a selected color
+	// if (state.selectedColor) {
+	// 	if (startPaintDrag(event.center.x, event.center.y)) {
+	// 		return;
+	// 	}
+	// }
+
+	// Handle pan for camera movement (fallback)
 	state.updatePointerState({
 		isDragging: true,
 		lastPos: { x: event.center.x, y: event.center.y }
@@ -217,6 +340,11 @@ function handlePanStart(event: HammerInput) {
 
 function handlePanMove(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
+
+	// Handle paint dragging first
+	if (updatePaintDrag(event.center.x, event.center.y)) {
+		return;
+	}
 
 	// Handle preview pixel dragging
 	if (updatePreviewDrag(event.center.x, event.center.y)) {
@@ -244,6 +372,11 @@ function handlePanMove(event: HammerInput) {
 
 function handlePanEnd(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
+
+	// Handle paint dragging completion first
+	if (finishPaintDrag()) {
+		return;
+	}
 
 	// Handle preview pixel dragging completion
 	const { wasDragging } = finishPreviewDrag();
@@ -279,16 +412,21 @@ function handlePinchMove(event: HammerInput) {
 
 	const currentCenter = { x: event.center.x, y: event.center.y };
 
-	// Handle preview pixel dragging during pinch if active
-	updatePreviewDrag(currentCenter.x, currentCenter.y);
+	// Handle paint dragging during pinch if active
+	if (updatePaintDrag(currentCenter.x, currentCenter.y)) {
+		// If paint dragging, skip panning but continue with zoom
+	} else {
+		// Handle preview pixel dragging during pinch if active
+		updatePreviewDrag(currentCenter.x, currentCenter.y);
+	}
 
 	// Handle panning: check if center has moved since last frame
 	const dx = currentCenter.x - pinchStartData.lastCenter.x;
 	const dy = currentCenter.y - pinchStartData.lastCenter.y;
 
 	if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-		// Apply panning based on center movement (only if not dragging preview pixels)
-		if (!previewDragState.isDragging || !previewDragState.hasMoved) {
+		// Apply panning based on center movement (only if not dragging preview pixels or paint dragging)
+		if ((!previewDragState.isDragging || !previewDragState.hasMoved) && !paintDragState.isDragging) {
 			state.updateCamera({
 				x: state.camera.x - dx / state.camera.scale,
 				y: state.camera.y - dy / state.camera.scale
@@ -324,6 +462,9 @@ function handlePinchMove(event: HammerInput) {
 function handlePinchEnd(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
 	pinchStartData = null;
+
+	// Reset paint drag state if it was active during pinch
+	finishPaintDrag();
 
 	// Reset preview drag state if it was active during pinch
 	finishPreviewDrag();
@@ -448,9 +589,16 @@ async function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 	const globalPos = event.global;
 
 	if (event.button === 0) { // Left click (mouse)
-		// Try to start preview pixel dragging first
+		// Try to start preview pixel dragging first (highest priority)
 		if (startPreviewDrag(globalPos.x, globalPos.y)) {
 			return;
+		}
+
+		// Try paint dragging next if we have a selected color
+		if (state.selectedColor) {
+			if (startPaintDrag(globalPos.x, globalPos.y)) {
+				return;
+			}
 		}
 
 		// Check if pixel modal should be shown first (for non-preview mode)
@@ -490,6 +638,25 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 	if (event.pointerType === 'touch') return;
 
 	const globalPos = event.global;
+	// Update mouse cursor position and coordinates display for mouse events
+	const worldPos = screenToWorld(globalPos.x, globalPos.y);
+	const pixelX = Math.floor(worldPos.x);
+	const pixelY = Math.floor(worldPos.y);
+
+	if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
+		state.updatePointerState({
+			mouseCursorPixel: { x: pixelX, y: pixelY }
+		});
+	} else {
+		state.updatePointerState({
+			mouseCursorPixel: null
+		});
+	}
+
+	// Handle paint dragging first
+	if (updatePaintDrag(globalPos.x, globalPos.y)) {
+		return;
+	}
 
 	// Handle preview pixel dragging
 	if (updatePreviewDrag(globalPos.x, globalPos.y)) {
@@ -510,21 +677,6 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 			lastPos: { x: globalPos.x, y: globalPos.y }
 		});
 	} else {
-		// Update mouse cursor position and coordinates display for mouse events
-		const worldPos = screenToWorld(globalPos.x, globalPos.y);
-		const pixelX = Math.floor(worldPos.x);
-		const pixelY = Math.floor(worldPos.y);
-
-		if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
-			state.updatePointerState({
-				mouseCursorPixel: { x: pixelX, y: pixelY }
-			});
-		} else {
-			state.updatePointerState({
-				mouseCursorPixel: null
-			});
-		}
-
 		// Check for pixel hover (show tooltip)
 		checkPixelHover(worldPos.x, worldPos.y).then(pixelInfo => {
 			showPixelTooltip(globalPos.x, globalPos.y, pixelInfo!.message, pixelInfo!.profile, pixelInfo!.timestamp);
@@ -537,6 +689,11 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 function handlePointerUp(event: PIXI.FederatedPointerEvent) {
 	// Only handle mouse events now (touch events are handled by Hammer.js)
 	if (event.pointerType === 'touch') return;
+
+	// Handle paint dragging completion first
+	if (finishPaintDrag()) {
+		return;
+	}
 
 	// Handle preview pixel dragging completion
 	const { wasDragging, hasMoved } = finishPreviewDrag();
@@ -563,6 +720,9 @@ function handlePointerUp(event: PIXI.FederatedPointerEvent) {
 function handlePointerLeave(event: PIXI.FederatedPointerEvent) {
 	// Only handle mouse events now (touch events are handled by Hammer.js)
 	if (event.pointerType === 'touch') return;
+
+	// Clean up paint dragging state
+	finishPaintDrag();
 
 	// Hide tooltip when mouse leaves canvas
 	hidePixelTooltip();
