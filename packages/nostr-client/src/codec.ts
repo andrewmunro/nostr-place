@@ -1,6 +1,10 @@
-import { NostrEvent } from 'nostr-tools';
+import { Event, NostrEvent } from 'nostr-tools';
 import * as pako from 'pako';
 import { PixelData, PixelEvent } from './types';
+
+export const getTag = (event: NostrEvent, tag: string) => {
+	return event.tags.find(t => t[0] === tag)?.[1];
+}
 
 export function encodePixels(pixels: PixelData[]): string {
 	// Convert pixels to the expected format: x,y,color\nx,y,color\n...
@@ -43,6 +47,28 @@ export function decodePixels(base64: string): PixelData[] {
 export class PixelCodec {
 	constructor(private canvasPubkey: string, private relays: string[]) { }
 
+	// Create a lightweight zap request for payment (kind 9734) without pixel data
+	createZapRequest(pixelEvent: PixelEvent, signedEvent: Event): NostrEvent {
+		const tags = [
+			['p', this.canvasPubkey],
+			['relays', ...this.relays],
+			['amount', (pixelEvent.amount * 1000).toString()],
+			['app', 'Zappy Place'],
+			['pixel_event_id', signedEvent.id],
+			['version', '2'],
+		];
+
+		return {
+			kind: 9734,
+			created_at: Math.floor(Date.now() / 1000),
+			content: `Zap request for ${pixelEvent.pixels.length} pixels on Zappy Place`,
+			tags,
+			pubkey: '',
+			id: '',
+			sig: ''
+		};
+	}
+
 	encodePixelEvent(pixelEvent: PixelEvent, debug = false): NostrEvent {
 		const encodedContent = encodePixels(pixelEvent.pixels);
 
@@ -52,7 +78,12 @@ export class PixelCodec {
 			['amount', (pixelEvent.amount * 1000).toString()],
 			['app', 'Zappy Place'],
 			['encoding', 'gzip+base64:v1'],
+			['version', '2'],
 		];
+
+		if (!debug) {
+			tags.push(['requires_payment', 'true']);
+		}
 
 		// Add message and URL as tags if present
 		if (pixelEvent.message) {
@@ -63,7 +94,7 @@ export class PixelCodec {
 		}
 
 		return {
-			kind: debug ? 90001 : 9734,
+			kind: 90001,
 			created_at: Math.floor(Date.now() / 1000),
 			content: encodedContent,
 			tags,

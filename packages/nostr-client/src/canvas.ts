@@ -1,7 +1,7 @@
 import { BlossomUploader } from '@nostrify/nostrify/uploaders';
 import { Filter, NostrEvent } from 'nostr-tools';
 import { NostrClient } from './client';
-import { PixelCodec } from './codec';
+import { getTag, PixelCodec } from './codec';
 import { LIGHTNING_CONFIG } from './constants';
 import { fetchLightningInvoice } from './lightning';
 import { calculateCostBreakdown, getPixelPrice, PreviewPixel } from './pricing';
@@ -14,6 +14,8 @@ export class NostrCanvas extends NostrClient {
 	private pixels: Map<string, PixelEvent> = new Map();
 	private processedEventIds: Set<string> = new Set(); // Track processed event IDs
 	private profileCache: Map<string, NostrProfile> = new Map();
+	private zapReceipts: Map<string, NostrEvent> = new Map();
+	private pixelDataEvents: Map<string, NostrEvent> = new Map();
 
 	constructor(config: Partial<NostrClientConfig> = {}, callbacks: CanvasEventCallbacks) {
 		const fullConfig = { ...createDefaultConfig(), ...config };
@@ -128,17 +130,76 @@ export class NostrCanvas extends NostrClient {
 	private handlePixelEvent(event: NostrEvent): void {
 		if (event.kind !== 90001 && event.kind !== 9735) return;
 
-		if (event.kind === 9735) {
-			const description = JSON.parse(event.tags.find(t => t[0] === 'description')?.[1] || '{}');
-			event = description;
-		}
-
 		// Deduplicate events by ID
 		if (this.processedEventIds.has(event.id)) {
 			return; // Skip already processed events
 		}
 
-		if (!event.tags.some(t => t[0] === 'app' && t[1] === 'Zappy Place')) return;
+		this.processedEventIds.add(event.id);
+
+		if (event.kind === 9735) {
+			// Handle zap receipt
+			this.handleZapReceipt(event);
+		} else if (event.kind === 90001) {
+			// Handle pixel data event
+			this.handlePixelDataEvent(event);
+		}
+	}
+
+	private handleZapReceipt(event: NostrEvent): void {
+		const description = JSON.parse(getTag(event, 'description') || '{}');
+		event = description;
+
+		// Check if this is a Zappy Place event
+		if (getTag(event, 'app') !== 'Zappy Place') {
+			return;
+		}
+
+		// Skip to processing if it's an old event
+		if (getTag(event, 'version') !== '2') {
+			this.processPixelData(event);
+			return;
+		}
+
+		const pixelEventId = getTag(event, 'pixel_event_id');
+		this.zapReceipts.set(pixelEventId, event);
+
+		this.matchPixelDataToZapReceipt(pixelEventId);
+	}
+
+	private handlePixelDataEvent(event: NostrEvent): void {
+		if (getTag(event, 'app') !== 'Zappy Place') return;
+
+		if (!Boolean(getTag(event, 'requires_payment'))) {
+			this.processPixelData(event);
+			return;
+		}
+
+		this.pixelDataEvents.set(event.id, event);
+		this.matchPixelDataToZapReceipt(event.id);
+	}
+
+	private matchPixelDataToZapReceipt(pixelEventId: string): void {
+		const zapReceipt = this.zapReceipts.get(pixelEventId);
+		if (!zapReceipt) {
+			return;
+		}
+		const pixelDataEvent = this.pixelDataEvents.get(pixelEventId);
+		if (!pixelDataEvent) {
+			return;
+		}
+
+		if (getTag(zapReceipt, 'amount') !== getTag(pixelDataEvent, 'amount')) {
+			console.warn('Amount mismatch between zap receipt and pixel data event. Disregarding.');
+			return;
+		}
+
+		this.processPixelData(pixelDataEvent);
+	}
+
+	private processPixelData(event: NostrEvent): void {
+		this.zapReceipts.delete(event.id);
+		this.pixelDataEvents.delete(event.id);
 
 		const pixelEvent = this.codec.decodePixelEvent(event);
 
@@ -152,9 +213,6 @@ export class NostrCanvas extends NostrClient {
 			}
 			return;
 		}
-
-		// Mark event as processed
-		this.processedEventIds.add(event.id);
 
 		// Store pixels from the event
 		for (const pixel of pixelEvent.pixels) {
@@ -182,26 +240,21 @@ export class NostrCanvas extends NostrClient {
 		const encodedEvent = this.codec.encodePixelEvent(pixelEvent, debug);
 		const signedEvent = await window.nostr.signEvent(encodedEvent);
 
-		if (debug) {
-			console.log('Debug pixel event:', signedEvent);
-			this.pool.publish(this.connectedRelays, signedEvent);
-		} else {
-			const lnurlResponse = await fetchLightningInvoice(pixelEvent, signedEvent);
+		await Promise.all(this.pool.publish(this.connectedRelays, signedEvent));
+
+		if (!debug) {
+			const zapRequest = this.codec.createZapRequest(pixelEvent, signedEvent);
+			const signedZapRequest = await window.nostr.signEvent(zapRequest);
+
+			const lnurlResponse = await fetchLightningInvoice(pixelEvent, signedZapRequest);
 			if (lnurlResponse.pr) {
-				// // Show the invoice modal
-				// showLightningInvoice(lnurlResponse.pr, amount, !!window.webln);
-
-				// // Start polling for payment confirmation
-				// const paymentHash = extractPaymentHash(lnurlResponse.pr);
-				// pollForZapReceipt(window.NostrTools.nip19.decode(npub).data, amount, eventId, paymentHash);
-
 				// Try to pay with WebLN if available
 				if (window.webln) {
 					await window.webln.enable();
 					const result = await window.webln.sendPayment(lnurlResponse.pr);
 					if (result.preimage) {
-						// Payment successful through WebLN
-						// The polling will detect it and show success
+						// Payment successful
+						console.log('Payment successful');
 					}
 				}
 			}
@@ -214,9 +267,6 @@ export class NostrCanvas extends NostrClient {
 			throw new Error('No connected relays');
 		}
 
-		if (!window.nostr) {
-			throw new Error('Nostr extension not available');
-		}
 
 		let finalContent = content;
 
