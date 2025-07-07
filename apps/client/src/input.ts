@@ -588,8 +588,18 @@ async function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 
 	const globalPos = event.global;
 
-	if (event.button === 0) { // Left click (mouse)
-		// Try to start preview pixel dragging first (highest priority)
+	if (event.button === 0) {
+		// Check if pixel modal should be shown first (for non-preview mode)
+		if (!state.previewState.isActive) {
+			const worldPos = screenToWorld(globalPos.x, globalPos.y);
+			const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
+			if (pixelInfo) {
+				showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile, pixelInfo.timestamp);
+				return; // Modal was shown, don't handle preview pixel placement
+			}
+		}
+
+		// Try to start preview pixel dragging first
 		if (startPreviewDrag(globalPos.x, globalPos.y)) {
 			return;
 		}
@@ -598,16 +608,6 @@ async function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 		if (state.selectedColor) {
 			if (startPaintDrag(globalPos.x, globalPos.y)) {
 				return;
-			}
-		}
-
-		// Check if pixel modal should be shown first (for non-preview mode)
-		if (!state.previewState.isActive) {
-			const worldPos = screenToWorld(globalPos.x, globalPos.y);
-			const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
-			if (pixelInfo) {
-				showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile, pixelInfo.timestamp);
-				return; // Modal was shown, don't handle preview pixel placement
 			}
 		}
 
