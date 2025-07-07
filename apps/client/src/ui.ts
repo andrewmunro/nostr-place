@@ -1,3 +1,5 @@
+import { NostrProfile } from '@zappy-place/nostr-client';
+import { npubEncode } from 'nostr-tools/nip19';
 import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
 import { nostrService } from './nostr';
@@ -478,9 +480,14 @@ function setupPixelTooltip() {
 function setupPixelModal() {
 	const pixelModal = document.getElementById('pixel-modal')!;
 	const pixelModalClose = document.getElementById('pixel-modal-close')!;
+	const pixelModalCloseFallback = document.getElementById('pixel-modal-close-fallback')!;
 
-	// Close modal when clicking the close button
+	// Close modal when clicking either close button
 	pixelModalClose.addEventListener('click', () => {
+		hidePixelModal();
+	});
+
+	pixelModalCloseFallback.addEventListener('click', () => {
 		hidePixelModal();
 	});
 
@@ -499,9 +506,23 @@ function setupPixelModal() {
 	});
 }
 
-export function showPixelTooltip(x: number, y: number, message: string) {
+export function showPixelTooltip(x: number, y: number, message: string, profile?: NostrProfile | null) {
 	const tooltip = document.getElementById('pixel-tooltip')!;
-	tooltip.textContent = message;
+	const tooltipProfilePic = document.getElementById('tooltip-profile-pic')! as HTMLImageElement;
+	const tooltipMessage = document.getElementById('tooltip-message')!;
+
+	// Set message
+	tooltipMessage.textContent = message;
+
+	// Set profile picture if available
+	if (profile?.picture) {
+		tooltipProfilePic.src = profile.picture;
+		tooltipProfilePic.classList.remove('hidden');
+	} else {
+		tooltipProfilePic.classList.add('hidden');
+	}
+
+	// Position tooltip
 	tooltip.style.left = `${x + 10}px`;
 	tooltip.style.top = `${y - 10}px`;
 	tooltip.classList.remove('hidden');
@@ -512,10 +533,58 @@ export function hidePixelTooltip() {
 	tooltip.classList.add('hidden');
 }
 
-export function showPixelModal(message?: string, url?: string) {
+export function showPixelModal(message?: string, url?: string, profile?: NostrProfile | null) {
 	const pixelModal = document.getElementById('pixel-modal')!;
 	const pixelModalMessage = document.getElementById('pixel-modal-message')!;
 	const pixelModalUrl = document.getElementById('pixel-modal-url')!;
+	const pixelModalProfile = document.getElementById('pixel-modal-profile')!;
+	const pixelModalFallbackHeader = document.getElementById('pixel-modal-fallback-header')!;
+	const pixelModalProfilePic = document.getElementById('pixel-modal-profile-pic')! as HTMLImageElement;
+	const pixelModalProfilePicLink = document.getElementById('pixel-modal-profile-pic-link')! as HTMLAnchorElement;
+	const pixelModalProfileName = document.getElementById('pixel-modal-profile-name')!;
+	const pixelModalProfileAbout = document.getElementById('pixel-modal-profile-about')!;
+	const pixelModalProfileLink = document.getElementById('pixel-modal-profile-link')! as HTMLAnchorElement;
+
+	// Show appropriate header based on profile availability
+	if (profile) {
+		// Set profile picture and link
+		if (profile.picture) {
+			pixelModalProfilePic.src = profile.picture;
+			pixelModalProfilePic.style.display = 'block';
+		} else {
+			pixelModalProfilePic.style.display = 'none';
+		}
+
+		// Set nostr.band link for both the picture and text link
+		const nostrBandUrl = `https://nostr.band/${npubEncode(profile.pubkey)}`;
+		pixelModalProfilePicLink.href = nostrBandUrl;
+		pixelModalProfileLink.href = nostrBandUrl;
+
+		// Set profile name (prefer display_name, fallback to name)
+		const displayName = profile.display_name || profile.name;
+		if (displayName) {
+			pixelModalProfileName.textContent = displayName;
+			pixelModalProfileName.style.display = 'block';
+		} else {
+			pixelModalProfileName.textContent = 'Anonymous';
+			pixelModalProfileName.style.display = 'block';
+		}
+
+		// Set profile about
+		if (profile.about) {
+			pixelModalProfileAbout.textContent = profile.about;
+			pixelModalProfileAbout.style.display = 'block';
+		} else {
+			pixelModalProfileAbout.style.display = 'none';
+		}
+
+		pixelModalProfile.classList.remove('hidden');
+		pixelModalFallbackHeader.classList.add('hidden');
+	} else {
+		// Show fallback header when no profile
+		pixelModalProfile.classList.add('hidden');
+		pixelModalFallbackHeader.classList.remove('hidden');
+	}
 
 	// Set message content
 	if (message) {
@@ -534,7 +603,7 @@ export function showPixelModal(message?: string, url?: string) {
 	}
 
 	// Show modal if there's any content
-	if (message || url) {
+	if (message || url || profile) {
 		pixelModal.classList.remove('hidden');
 	}
 }

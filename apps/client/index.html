@@ -195,14 +195,33 @@
 	</div>
 
 	<!-- Pixel Tooltip -->
-	<div id="pixel-tooltip" class="pixel-tooltip hidden"></div>
+	<div id="pixel-tooltip" class="pixel-tooltip hidden">
+		<div class="tooltip-content">
+			<img id="tooltip-profile-pic" class="tooltip-profile-pic hidden" src="" alt="Profile">
+			<div id="tooltip-message" class="tooltip-message"></div>
+		</div>
+	</div>
 
 	<!-- Pixel Info Modal -->
 	<div id="pixel-modal" class="pixel-modal hidden">
 		<div class="pixel-modal-content">
-			<div class="pixel-modal-header">
-				<h3>📍 Pixel Info</h3>
+			<div id="pixel-modal-profile" class="pixel-modal-profile-header hidden">
+				<div class="profile-header">
+					<a id="pixel-modal-profile-pic-link" href="" target="_blank" rel="noopener noreferrer">
+						<img id="pixel-modal-profile-pic" class="profile-pic" src="" alt="Profile">
+					</a>
+					<div class="profile-info">
+						<div id="pixel-modal-profile-name" class="profile-name"></div>
+						<div id="pixel-modal-profile-about" class="profile-about"></div>
+						<a id="pixel-modal-profile-link" class="profile-link" href="" target="_blank"
+							rel="noopener noreferrer">View on nostr.band</a>
+					</div>
+				</div>
 				<button class="pixel-modal-close" id="pixel-modal-close">×</button>
+			</div>
+			<div id="pixel-modal-fallback-header" class="pixel-modal-header hidden">
+				<h3>📍 Pixel Info</h3>
+				<button class="pixel-modal-close" id="pixel-modal-close-fallback">×</button>
 			</div>
 			<div class="pixel-modal-body">
 				<div id="pixel-modal-message" class="pixel-modal-message"></div>

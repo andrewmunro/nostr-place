@@ -73,7 +73,7 @@ function setupHammerJS() {
 }
 
 // Check and show tooltip for center pixel on touch devices
-function checkCenterPixelTooltip() {
+async function checkCenterPixelTooltip() {
 	const centerPixel = getCenterPixel();
 	const pixelKey = `${centerPixel.x},${centerPixel.y}`;
 
@@ -83,12 +83,12 @@ function checkCenterPixelTooltip() {
 	lastCenterPixelKey = pixelKey;
 
 	// Check if this pixel has tooltip information
-	const pixelInfo = checkPixelHover(centerPixel.x, centerPixel.y);
+	const pixelInfo = await checkPixelHover(centerPixel.x, centerPixel.y);
 	if (pixelInfo && pixelInfo.message) {
 		// Show tooltip at center of screen for touch devices
 		const centerX = state.app.screen.width / 2;
 		const centerY = state.app.screen.height / 2;
-		showPixelTooltip(centerX, centerY, pixelInfo.message);
+		showPixelTooltip(centerX, centerY, pixelInfo.message, pixelInfo.profile);
 	} else {
 		hidePixelTooltip();
 	}
@@ -202,7 +202,7 @@ function handlePinchEnd(event: HammerInput) {
 	checkCenterPixelTooltip();
 }
 
-function handleTap(event: HammerInput) {
+async function handleTap(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
 	// Handle tap for pixel placement (similar to mouse click)
 	if (state.selectedColor) {
@@ -213,7 +213,7 @@ function handleTap(event: HammerInput) {
 		if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE) {
 			// Check if pixel modal should be shown first (for non-preview mode)
 			if (!state.previewState.isActive) {
-				const pixelInfo = checkPixelClick(worldPos.x, worldPos.y);
+				const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
 				if (pixelInfo) {
 					// Prevent event propagation to avoid clicking modal buttons immediately
 					event.preventDefault();
@@ -222,7 +222,7 @@ function handleTap(event: HammerInput) {
 
 					// Small delay to ensure the tap doesn't interfere with modal interaction
 					setTimeout(() => {
-						showPixelModal(pixelInfo.message, pixelInfo.url);
+						showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile);
 					}, 50);
 					return;
 				}
@@ -322,7 +322,7 @@ function handleKeyDown(event: KeyboardEvent) {
 	}
 }
 
-function handlePointerDown(event: PIXI.FederatedPointerEvent) {
+async function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 	// Only handle mouse events now (touch events are handled by Hammer.js)
 	if (event.pointerType === 'touch') return;
 
@@ -331,9 +331,9 @@ function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 	// Check if pixel modal should be shown first (for non-preview mode)
 	if (!state.previewState.isActive && event.button === 0) {
 		const worldPos = screenToWorld(globalPos.x, globalPos.y);
-		const pixelInfo = checkPixelClick(worldPos.x, worldPos.y);
+		const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
 		if (pixelInfo) {
-			showPixelModal(pixelInfo.message, pixelInfo.url);
+			showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile);
 			return; // Modal was shown, don't handle preview pixel placement
 		}
 	}
@@ -397,12 +397,15 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 		}
 
 		// Check for pixel hover (show tooltip)
-		const pixelInfo = checkPixelHover(worldPos.x, worldPos.y);
-		if (pixelInfo && pixelInfo.message) {
-			showPixelTooltip(globalPos.x, globalPos.y, pixelInfo.message);
-		} else {
+		checkPixelHover(worldPos.x, worldPos.y).then(pixelInfo => {
+			if (pixelInfo && pixelInfo.message) {
+				showPixelTooltip(globalPos.x, globalPos.y, pixelInfo.message, pixelInfo.profile);
+			} else {
+				hidePixelTooltip();
+			}
+		}).catch(() => {
 			hidePixelTooltip();
-		}
+		});
 	}
 }
 
@@ -465,82 +468,65 @@ function togglePreviewPixel(x: number, y: number, color: string) {
 }
 
 // Add hover detection for pixel messages
-export function checkPixelHover(worldX: number, worldY: number): { message?: string; url?: string } | null {
+export async function checkPixelHover(worldX: number, worldY: number): Promise<{ message?: string; url?: string; profile?: any } | null> {
 	const pixelX = Math.floor(worldX);
 	const pixelY = Math.floor(worldY);
 
-	// Check debug mode pixels first
-	const debugPixelData = state.pixels.get(`${pixelX},${pixelY}`);
-	if (debugPixelData) {
-		// For debug mode, hardcode test messages for specific coordinates
-		if (pixelX === 1000 && pixelY === 1000) {
-			return { message: '🚀 Welcome to Zappy Place!', url: 'https://github.com/andrewmunro/zappy-place' };
-		} else if (pixelX === 1001 && pixelY === 1000) {
-			return { message: 'This is a test message for the tooltip system. Hover over me!' };
-		} else if (pixelX === 1002 && pixelY === 1000) {
-			return { message: 'Click me to see the modal!', url: 'https://nostr.com' };
-		} else if (pixelX === 1003 && pixelY === 1000) {
-			return { url: 'https://bitcoin.org' };
-		} else if (pixelX === 1004 && pixelY === 1000) {
-			return { message: '🎨 Collaborative pixel art powered by Nostr + Lightning!', url: 'https://zappy.place' };
-		} else if (pixelX === 500 && pixelY === 500) {
-			return { message: '🔥 This is awesome!' };
-		} else if (pixelX === 501 && pixelY === 500) {
-			return { message: '💎 HODL Bitcoin!', url: 'https://bitcoin.org' };
-		} else if (pixelX === 502 && pixelY === 500) {
-			return { message: '⚡ Lightning fast!' };
-		} else if (pixelX === 500 && pixelY === 501) {
-			return { message: '🌈 So many colors!' };
-		} else if (pixelX === 501 && pixelY === 501) {
-			return { message: 'Check out our repo!', url: 'https://github.com/andrewmunro/zappy-place' };
-		}
-	}
-
 	// Check Nostr canvas pixels
 	const nostrPixelEvent = nostrService.canvas.getPixelEvent(pixelX, pixelY);
-	if (nostrPixelEvent && (nostrPixelEvent.message || nostrPixelEvent.url)) {
-		return { message: nostrPixelEvent.message, url: nostrPixelEvent.url };
+	if (nostrPixelEvent) {
+		let profile = null;
+
+		// Fetch profile if we have a sender pubkey
+		if (nostrPixelEvent.senderPubkey) {
+			try {
+				// For hover, we try to get profile quickly (will return cached if available)
+				profile = await nostrService.canvas.fetchProfile(nostrPixelEvent.senderPubkey);
+			} catch (error) {
+				console.warn('Failed to fetch profile for hover:', error);
+			}
+		}
+
+		if (nostrPixelEvent.message || nostrPixelEvent.url || profile) {
+			return {
+				message: nostrPixelEvent.message,
+				url: nostrPixelEvent.url,
+				profile: profile
+			};
+		}
 	}
 
 	return null;
 }
 
 // Add click handling for pixel modal
-export function checkPixelClick(worldX: number, worldY: number): { message?: string; url?: string } | null {
+export async function checkPixelClick(worldX: number, worldY: number): Promise<{ message?: string; url?: string; profile?: any } | null> {
 	const pixelX = Math.floor(worldX);
 	const pixelY = Math.floor(worldY);
 
-	// Check debug mode pixels first
-	const debugPixelData = state.pixels.get(`${pixelX},${pixelY}`);
-	if (debugPixelData) {
-		// For debug mode, hardcode test messages for specific coordinates
-		if (pixelX === 1000 && pixelY === 1000) {
-			return { message: '🚀 Welcome to Zappy Place!', url: 'https://github.com/andrewmunro/zappy-place' };
-		} else if (pixelX === 1001 && pixelY === 1000) {
-			return { message: 'This is a test message for the tooltip system. Hover over me!' };
-		} else if (pixelX === 1002 && pixelY === 1000) {
-			return { message: 'Click me to see the modal!', url: 'https://nostr.com' };
-		} else if (pixelX === 1003 && pixelY === 1000) {
-			return { url: 'https://bitcoin.org' };
-		} else if (pixelX === 1004 && pixelY === 1000) {
-			return { message: '🎨 Collaborative pixel art powered by Nostr + Lightning!', url: 'https://zappy.place' };
-		} else if (pixelX === 500 && pixelY === 500) {
-			return { message: '🔥 This is awesome!' };
-		} else if (pixelX === 501 && pixelY === 500) {
-			return { message: '💎 HODL Bitcoin!', url: 'https://bitcoin.org' };
-		} else if (pixelX === 502 && pixelY === 500) {
-			return { message: '⚡ Lightning fast!' };
-		} else if (pixelX === 500 && pixelY === 501) {
-			return { message: '🌈 So many colors!' };
-		} else if (pixelX === 501 && pixelY === 501) {
-			return { message: 'Check out our repo!', url: 'https://github.com/andrewmunro/zappy-place' };
-		}
-	}
-
 	// Check Nostr canvas pixels
 	const nostrPixelEvent = nostrService.canvas.getPixelEvent(pixelX, pixelY);
-	if (nostrPixelEvent && (nostrPixelEvent.message || nostrPixelEvent.url)) {
-		return { message: nostrPixelEvent.message, url: nostrPixelEvent.url };
+	if (nostrPixelEvent) {
+		let profile = null;
+
+		// Fetch profile if we have a sender pubkey
+		if (nostrPixelEvent.senderPubkey) {
+			try {
+				// For click events, we wait for the profile to load
+				profile = await nostrService.canvas.fetchProfile(nostrPixelEvent.senderPubkey);
+			} catch (error) {
+				console.warn('Failed to fetch profile:', error);
+				// Still return pixel info even if profile fetch fails
+			}
+		}
+
+		if (nostrPixelEvent.message || nostrPixelEvent.url || profile) {
+			return {
+				message: nostrPixelEvent.message,
+				url: nostrPixelEvent.url,
+				profile: profile
+			};
+		}
 	}
 
 	return null;

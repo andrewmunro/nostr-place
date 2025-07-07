@@ -73,6 +73,22 @@ export interface CostBreakdown {
 	};
 }
 
+// Profile metadata from Kind 0 events
+export interface NostrProfile {
+	pubkey: string;
+	name?: string;
+	display_name?: string;
+	about?: string;
+	picture?: string;
+	nip05?: string;
+	website?: string;
+	lud16?: string;
+	banner?: string;
+	// Cache metadata
+	fetchedAt: number;
+	lastUpdated?: number;
+}
+
 // Browser extension type declarations
 declare global {
 	interface Window {

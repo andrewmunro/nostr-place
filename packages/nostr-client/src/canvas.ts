@@ -4,7 +4,7 @@ import { PixelCodec } from './codec';
 import { LIGHTNING_CONFIG } from './constants';
 import { fetchLightningInvoice } from './lightning';
 import { calculateCostBreakdown, getPixelPrice, PreviewPixel } from './pricing';
-import { CanvasEventCallbacks, CostBreakdown, NostrClientConfig, PixelEvent, RelayConnection } from './types';
+import { CanvasEventCallbacks, CostBreakdown, NostrClientConfig, NostrProfile, PixelEvent, RelayConnection } from './types';
 import { validatePixelEvent, validatePixelEventOptimistic } from './validation';
 
 export class NostrCanvas extends NostrClient {
@@ -12,8 +12,7 @@ export class NostrCanvas extends NostrClient {
 	private codec: PixelCodec;
 	private pixels: Map<string, PixelEvent> = new Map();
 	private processedEventIds: Set<string> = new Set(); // Track processed event IDs
-	private readonly MAX_PROCESSED_EVENTS = 10000; // Limit memory usage
-	private cleanupInterval: NodeJS.Timeout | null = null; // Store interval ID for cleanup
+	private profileCache: Map<string, NostrProfile> = new Map();
 
 	constructor(config: Partial<NostrClientConfig> = {}, callbacks: CanvasEventCallbacks) {
 		const fullConfig = { ...createDefaultConfig(), ...config };
@@ -21,9 +20,6 @@ export class NostrCanvas extends NostrClient {
 
 		this.callbacks = callbacks;
 		this.codec = new PixelCodec(LIGHTNING_CONFIG.PUBKEY, this.config.relays);
-
-		// Clean up old event IDs periodically to prevent memory leaks
-		this.cleanupInterval = setInterval(() => this.cleanupProcessedEvents(), 300000); // Every 5 minutes
 	}
 
 	async initialize(): Promise<void> {
@@ -239,29 +235,80 @@ export class NostrCanvas extends NostrClient {
 		return this.pixels.get(`${x},${y}`);
 	}
 
-	async disconnect(): Promise<void> {
-		// Clean up the interval timer
-		if (this.cleanupInterval) {
-			clearInterval(this.cleanupInterval);
-			this.cleanupInterval = null;
+	// Profile fetching functionality
+	async fetchProfile(pubkey: string): Promise<NostrProfile | null> {
+		// Check cache first
+		const cached = this.profileCache.get(pubkey);
+		if (cached) {
+			return cached;
 		}
 
-		await super.disconnect();
-	}
+		try {
+			// Create filter for kind 0 events (profile metadata)
+			const filter: Filter = {
+				kinds: [0],
+				authors: [pubkey],
+				limit: 1
+			};
 
-	private cleanupProcessedEvents(): void {
-		// If we have too many processed event IDs, clear some old ones
-		if (this.processedEventIds.size > this.MAX_PROCESSED_EVENTS) {
-			console.log(`Cleaning up processed event IDs (${this.processedEventIds.size} -> ${this.MAX_PROCESSED_EVENTS / 2})`);
+			return new Promise<NostrProfile | null>((resolve) => {
+				let resolved = false;
+				let profile: NostrProfile | null = null;
 
-			// Convert to array, keep only the most recent half
-			const eventIds = Array.from(this.processedEventIds);
-			this.processedEventIds.clear();
+				const timeout = setTimeout(() => {
+					if (!resolved) {
+						resolved = true;
+						// Return cached profile if available, even if expired
+						resolve(cached || null);
+					}
+				}, 3000); // 3 second timeout
 
-			// Keep the second half (more recent events)
-			const keepCount = Math.floor(this.MAX_PROCESSED_EVENTS / 2);
-			const recentEvents = eventIds.slice(-keepCount);
-			recentEvents.forEach(id => this.processedEventIds.add(id));
+				this.pool.subscribe(this.connectedRelays, filter, {
+					onevent: (event: NostrEvent) => {
+						if (resolved) return;
+
+						try {
+							const metadata = JSON.parse(event.content);
+							profile = {
+								pubkey,
+								name: metadata.name,
+								display_name: metadata.display_name,
+								about: metadata.about,
+								picture: metadata.picture,
+								nip05: metadata.nip05,
+								website: metadata.website,
+								lud16: metadata.lud16,
+								banner: metadata.banner,
+								fetchedAt: Date.now(),
+								lastUpdated: event.created_at * 1000
+							};
+
+							// Cache the profile
+							this.profileCache.set(pubkey, profile);
+						} catch (error) {
+							console.warn('Failed to parse profile metadata:', error);
+						}
+					},
+					oneose: () => {
+						if (!resolved) {
+							resolved = true;
+							clearTimeout(timeout);
+							resolve(profile);
+						}
+					},
+					onclose: () => {
+						if (!resolved) {
+							resolved = true;
+							clearTimeout(timeout);
+							resolve(cached || null);
+						}
+					}
+				});
+			});
+		} catch (error) {
+			console.error('Failed to fetch profile:', error);
+			// Return cached profile if available
+			return cached || null;
 		}
 	}
 }
