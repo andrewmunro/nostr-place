@@ -8,6 +8,28 @@ import { state } from './state';
 // Color palette constants
 const COLORS_PER_ROW = 2;
 
+// Utility function to format relative time
+function formatRelativeTime(timestamp: number): string {
+	const now = Date.now();
+	const timeDiff = now - (timestamp * 1000); // Convert from seconds to milliseconds
+
+	const seconds = Math.floor(timeDiff / 1000);
+	const minutes = Math.floor(seconds / 60);
+	const hours = Math.floor(minutes / 60);
+	const days = Math.floor(hours / 24);
+	const weeks = Math.floor(days / 7);
+	const months = Math.floor(days / 30);
+	const years = Math.floor(days / 365);
+
+	if (seconds < 60) return 'now';
+	if (minutes < 60) return `${minutes} min`;
+	if (hours < 24) return `${hours} hr`;
+	if (days < 7) return `${days} day${days !== 1 ? 's' : ''}`;
+	if (weeks < 4) return `${weeks} week${weeks !== 1 ? 's' : ''}`;
+	if (months < 12) return `${months} month${months !== 1 ? 's' : ''}`;
+	return `${years} year${years !== 1 ? 's' : ''}`;
+}
+
 export function setupUI() {
 	setupColorPalette();
 	setupZoomControls();
@@ -506,13 +528,14 @@ function setupPixelModal() {
 	});
 }
 
-export function showPixelTooltip(x: number, y: number, message: string, profile?: NostrProfile | null) {
+export function showPixelTooltip(x: number, y: number, message?: string, profile?: NostrProfile | null, timestamp?: number) {
 	const tooltip = document.getElementById('pixel-tooltip')!;
 	const tooltipProfilePic = document.getElementById('tooltip-profile-pic')! as HTMLImageElement;
 	const tooltipMessage = document.getElementById('tooltip-message')!;
+	const tooltipTimestamp = document.getElementById('tooltip-timestamp')!;
 
 	// Set message
-	tooltipMessage.textContent = message;
+	tooltipMessage.textContent = message || '';
 
 	// Set profile picture if available
 	if (profile?.picture) {
@@ -520,6 +543,14 @@ export function showPixelTooltip(x: number, y: number, message: string, profile?
 		tooltipProfilePic.classList.remove('hidden');
 	} else {
 		tooltipProfilePic.classList.add('hidden');
+	}
+
+	// Set timestamp if available
+	if (timestamp) {
+		tooltipTimestamp.textContent = formatRelativeTime(timestamp);
+		tooltipTimestamp.classList.remove('hidden');
+	} else {
+		tooltipTimestamp.classList.add('hidden');
 	}
 
 	// Position tooltip
@@ -533,9 +564,11 @@ export function hidePixelTooltip() {
 	tooltip.classList.add('hidden');
 }
 
-export function showPixelModal(message?: string, url?: string, profile?: NostrProfile | null) {
+export function showPixelModal(message?: string, url?: string, profile?: NostrProfile | null, timestamp?: number) {
 	const pixelModal = document.getElementById('pixel-modal')!;
 	const pixelModalMessage = document.getElementById('pixel-modal-message')!;
+	const pixelModalTimestampProfile = document.getElementById('pixel-modal-timestamp-profile')!;
+	const pixelModalTimestampFallback = document.getElementById('pixel-modal-timestamp-fallback')!;
 	const pixelModalUrl = document.getElementById('pixel-modal-url')!;
 	const pixelModalProfile = document.getElementById('pixel-modal-profile')!;
 	const pixelModalFallbackHeader = document.getElementById('pixel-modal-fallback-header')!;
@@ -592,6 +625,23 @@ export function showPixelModal(message?: string, url?: string, profile?: NostrPr
 		pixelModalMessage.style.display = 'block';
 	} else {
 		pixelModalMessage.style.display = 'none';
+	}
+
+	// Set timestamp content in appropriate header
+	if (timestamp) {
+		const timestampText = `${formatRelativeTime(timestamp)} ago`;
+		if (profile) {
+			pixelModalTimestampProfile.textContent = timestampText;
+			pixelModalTimestampProfile.classList.remove('hidden');
+			pixelModalTimestampFallback.classList.add('hidden');
+		} else {
+			pixelModalTimestampFallback.textContent = timestampText;
+			pixelModalTimestampFallback.classList.remove('hidden');
+			pixelModalTimestampProfile.classList.add('hidden');
+		}
+	} else {
+		pixelModalTimestampProfile.classList.add('hidden');
+		pixelModalTimestampFallback.classList.add('hidden');
 	}
 
 	// Set URL content

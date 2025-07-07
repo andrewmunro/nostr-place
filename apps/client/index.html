@@ -198,7 +198,10 @@
 	<div id="pixel-tooltip" class="pixel-tooltip hidden">
 		<div class="tooltip-content">
 			<img id="tooltip-profile-pic" class="tooltip-profile-pic hidden" src="" alt="Profile">
-			<div id="tooltip-message" class="tooltip-message"></div>
+			<div class="tooltip-text">
+				<div id="tooltip-message" class="tooltip-message"></div>
+				<div id="tooltip-timestamp" class="tooltip-timestamp hidden"></div>
+			</div>
 		</div>
 	</div>
 
@@ -217,11 +220,17 @@
 							rel="noopener noreferrer">View on nostr.band</a>
 					</div>
 				</div>
-				<button class="pixel-modal-close" id="pixel-modal-close">×</button>
+				<div class="header-actions">
+					<div id="pixel-modal-timestamp-profile" class="pixel-modal-timestamp-header hidden"></div>
+					<button class="pixel-modal-close" id="pixel-modal-close">×</button>
+				</div>
 			</div>
 			<div id="pixel-modal-fallback-header" class="pixel-modal-header hidden">
 				<h3>📍 Pixel Info</h3>
-				<button class="pixel-modal-close" id="pixel-modal-close-fallback">×</button>
+				<div class="header-actions">
+					<div id="pixel-modal-timestamp-fallback" class="pixel-modal-timestamp-header hidden"></div>
+					<button class="pixel-modal-close" id="pixel-modal-close-fallback">×</button>
+				</div>
 			</div>
 			<div class="pixel-modal-body">
 				<div id="pixel-modal-message" class="pixel-modal-message"></div>

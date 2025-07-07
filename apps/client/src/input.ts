@@ -84,11 +84,11 @@ async function checkCenterPixelTooltip() {
 
 	// Check if this pixel has tooltip information
 	const pixelInfo = await checkPixelHover(centerPixel.x, centerPixel.y);
-	if (pixelInfo && pixelInfo.message) {
+	if (pixelInfo) {
 		// Show tooltip at center of screen for touch devices
 		const centerX = state.app.screen.width / 2;
 		const centerY = state.app.screen.height / 2;
-		showPixelTooltip(centerX, centerY, pixelInfo.message, pixelInfo.profile);
+		showPixelTooltip(centerX, centerY, pixelInfo.message, pixelInfo.profile, pixelInfo.timestamp);
 	} else {
 		hidePixelTooltip();
 	}
@@ -222,7 +222,7 @@ async function handleTap(event: HammerInput) {
 
 					// Small delay to ensure the tap doesn't interfere with modal interaction
 					setTimeout(() => {
-						showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile);
+						showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile, pixelInfo.timestamp);
 					}, 50);
 					return;
 				}
@@ -333,7 +333,7 @@ async function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 		const worldPos = screenToWorld(globalPos.x, globalPos.y);
 		const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
 		if (pixelInfo) {
-			showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile);
+			showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile, pixelInfo.timestamp);
 			return; // Modal was shown, don't handle preview pixel placement
 		}
 	}
@@ -398,11 +398,7 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 
 		// Check for pixel hover (show tooltip)
 		checkPixelHover(worldPos.x, worldPos.y).then(pixelInfo => {
-			if (pixelInfo && pixelInfo.message) {
-				showPixelTooltip(globalPos.x, globalPos.y, pixelInfo.message, pixelInfo.profile);
-			} else {
-				hidePixelTooltip();
-			}
+			showPixelTooltip(globalPos.x, globalPos.y, pixelInfo!.message, pixelInfo!.profile, pixelInfo!.timestamp);
 		}).catch(() => {
 			hidePixelTooltip();
 		});
@@ -468,7 +464,7 @@ function togglePreviewPixel(x: number, y: number, color: string) {
 }
 
 // Add hover detection for pixel messages
-export async function checkPixelHover(worldX: number, worldY: number): Promise<{ message?: string; url?: string; profile?: any } | null> {
+export async function checkPixelHover(worldX: number, worldY: number): Promise<{ message?: string; url?: string; profile?: any; timestamp?: number } | null> {
 	const pixelX = Math.floor(worldX);
 	const pixelY = Math.floor(worldY);
 
@@ -491,7 +487,8 @@ export async function checkPixelHover(worldX: number, worldY: number): Promise<{
 			return {
 				message: nostrPixelEvent.message,
 				url: nostrPixelEvent.url,
-				profile: profile
+				profile: profile,
+				timestamp: nostrPixelEvent.timestamp
 			};
 		}
 	}
@@ -500,7 +497,7 @@ export async function checkPixelHover(worldX: number, worldY: number): Promise<{
 }
 
 // Add click handling for pixel modal
-export async function checkPixelClick(worldX: number, worldY: number): Promise<{ message?: string; url?: string; profile?: any } | null> {
+export async function checkPixelClick(worldX: number, worldY: number): Promise<{ message?: string; url?: string; profile?: any; timestamp?: number } | null> {
 	const pixelX = Math.floor(worldX);
 	const pixelY = Math.floor(worldY);
 
@@ -524,7 +521,8 @@ export async function checkPixelClick(worldX: number, worldY: number): Promise<{
 			return {
 				message: nostrPixelEvent.message,
 				url: nostrPixelEvent.url,
-				profile: profile
+				profile: profile,
+				timestamp: nostrPixelEvent.timestamp
 			};
 		}
 	}
