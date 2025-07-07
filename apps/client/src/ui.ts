@@ -4,6 +4,7 @@ import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
 import { nostrService } from './nostr';
 import { state } from './state';
+import { throttle } from './utils';
 
 // Color palette constants
 const COLORS_PER_ROW = 2;
@@ -45,11 +46,11 @@ export function setupUI() {
 	}
 }
 
-export function updateUI() {
+export const updateUI = throttle(() => {
 	updateCoordinatesDisplay();
 	updateActionButtons();
 	updatePreviewModeUI();
-}
+}, 200)
 
 function setupColorPalette() {
 	const colorPalette = document.getElementById('color-palette')!;

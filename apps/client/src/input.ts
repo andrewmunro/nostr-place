@@ -9,12 +9,114 @@ import { hidePixelTooltip, showPixelModal, showPixelTooltip } from './ui';
 
 // Touch control constants
 const TOUCH_HOLD_DURATION = 400; // milliseconds to hold for placing pixel (increased for better UX)
+const DRAG_THRESHOLD = 5; // pixels to move before considering it a drag
 
 // Hammer.js instance
 let hammer: HammerManager | null = null;
 
 // Touch tooltip state
 let lastCenterPixelKey: string | null = null;
+
+// Preview mode dragging state
+interface PreviewDragState {
+	isDragging: boolean;
+	startPos: { x: number; y: number } | null;
+	startWorldPos: { x: number; y: number } | null;
+	hasMoved: boolean;
+	lastAppliedOffset: { x: number; y: number };
+}
+
+let previewDragState: PreviewDragState = {
+	isDragging: false,
+	startPos: null,
+	startWorldPos: null,
+	hasMoved: false,
+	lastAppliedOffset: { x: 0, y: 0 }
+};
+
+// Helper functions for preview pixel dragging
+function startPreviewDrag(screenX: number, screenY: number) {
+	if (!state.previewState.isActive || state.previewState.pixels.size === 0) {
+		return false;
+	}
+
+	// Check if the touch/click position is on a preview pixel
+	const worldPos = screenToWorld(screenX, screenY);
+	const pixelX = Math.floor(worldPos.x);
+	const pixelY = Math.floor(worldPos.y);
+	const pixelKey = `${pixelX},${pixelY}`;
+
+	// Only start dragging if the touch is on an actual preview pixel
+	if (!state.previewState.pixels.has(pixelKey)) {
+		return false;
+	}
+
+	previewDragState = {
+		isDragging: true,
+		startPos: { x: screenX, y: screenY },
+		startWorldPos: { x: worldPos.x, y: worldPos.y },
+		hasMoved: false,
+		lastAppliedOffset: { x: 0, y: 0 }
+	};
+	return true;
+}
+
+function updatePreviewDrag(screenX: number, screenY: number) {
+	if (!previewDragState.isDragging || !previewDragState.startPos) {
+		return false;
+	}
+
+	const dx = screenX - previewDragState.startPos.x;
+	const dy = screenY - previewDragState.startPos.y;
+	const distance = Math.sqrt(dx * dx + dy * dy);
+
+	// Check if we've moved beyond the drag threshold
+	if (!previewDragState.hasMoved && distance > DRAG_THRESHOLD) {
+		previewDragState.hasMoved = true;
+		(state.app.view as HTMLCanvasElement).style.cursor = 'grabbing';
+	}
+
+	// If we're dragging, move all preview pixels
+	if (previewDragState.hasMoved) {
+		const currentWorldPos = screenToWorld(screenX, screenY);
+		const targetOffsetX = Math.round(currentWorldPos.x - previewDragState.startWorldPos!.x);
+		const targetOffsetY = Math.round(currentWorldPos.y - previewDragState.startWorldPos!.y);
+
+		// Only move if the target offset has changed
+		if (targetOffsetX !== previewDragState.lastAppliedOffset.x || targetOffsetY !== previewDragState.lastAppliedOffset.y) {
+			const deltaX = targetOffsetX - previewDragState.lastAppliedOffset.x;
+			const deltaY = targetOffsetY - previewDragState.lastAppliedOffset.y;
+
+			// Move all preview pixels by the delta
+			moveAllPreviewPixels(deltaX, deltaY);
+
+			// Update last applied offset
+			previewDragState.lastAppliedOffset = { x: targetOffsetX, y: targetOffsetY };
+		}
+	}
+
+	// Return true if we're in dragging state, even before threshold is reached
+	return previewDragState.isDragging;
+}
+
+function finishPreviewDrag() {
+	const wasDragging = previewDragState.isDragging;
+	const hasMoved = previewDragState.hasMoved;
+
+	previewDragState = {
+		isDragging: false,
+		startPos: null,
+		startWorldPos: null,
+		hasMoved: false,
+		lastAppliedOffset: { x: 0, y: 0 }
+	};
+
+	if (wasDragging) {
+		(state.app.view as HTMLCanvasElement).style.cursor = 'default';
+	}
+
+	return { wasDragging, hasMoved };
+}
 
 export function setupInput() {
 	// Handle URL changes
@@ -97,7 +199,13 @@ async function checkCenterPixelTooltip() {
 // Hammer.js gesture handlers
 function handlePanStart(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
-	// Handle pan for both single finger and during pinch
+
+	// Try to start preview pixel dragging first
+	if (startPreviewDrag(event.center.x, event.center.y)) {
+		return;
+	}
+
+	// Handle pan for camera movement
 	state.updatePointerState({
 		isDragging: true,
 		lastPos: { x: event.center.x, y: event.center.y }
@@ -109,7 +217,13 @@ function handlePanStart(event: HammerInput) {
 
 function handlePanMove(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
-	// Handle pan for both single finger and during pinch
+
+	// Handle preview pixel dragging
+	if (updatePreviewDrag(event.center.x, event.center.y)) {
+		return;
+	}
+
+	// Handle camera panning for both single finger and during pinch
 	if (state.pointerState.isDragging) {
 		const dx = event.center.x - state.pointerState.lastPos.x;
 		const dy = event.center.y - state.pointerState.lastPos.y;
@@ -130,7 +244,14 @@ function handlePanMove(event: HammerInput) {
 
 function handlePanEnd(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
-	// Only stop panning when all fingers are lifted
+
+	// Handle preview pixel dragging completion
+	const { wasDragging } = finishPreviewDrag();
+	if (wasDragging) {
+		return;
+	}
+
+	// Only stop camera panning when all fingers are lifted
 	if (event.pointers.length === 0) {
 		state.updatePointerState({ isDragging: false });
 		(state.app.view as HTMLCanvasElement).style.cursor = 'default';
@@ -158,16 +279,21 @@ function handlePinchMove(event: HammerInput) {
 
 	const currentCenter = { x: event.center.x, y: event.center.y };
 
+	// Handle preview pixel dragging during pinch if active
+	updatePreviewDrag(currentCenter.x, currentCenter.y);
+
 	// Handle panning: check if center has moved since last frame
 	const dx = currentCenter.x - pinchStartData.lastCenter.x;
 	const dy = currentCenter.y - pinchStartData.lastCenter.y;
 
 	if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-		// Apply panning based on center movement
-		state.updateCamera({
-			x: state.camera.x - dx / state.camera.scale,
-			y: state.camera.y - dy / state.camera.scale
-		});
+		// Apply panning based on center movement (only if not dragging preview pixels)
+		if (!previewDragState.isDragging || !previewDragState.hasMoved) {
+			state.updateCamera({
+				x: state.camera.x - dx / state.camera.scale,
+				y: state.camera.y - dy / state.camera.scale
+			});
+		}
 	}
 
 	// Handle zooming
@@ -198,12 +324,22 @@ function handlePinchMove(event: HammerInput) {
 function handlePinchEnd(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
 	pinchStartData = null;
+
+	// Reset preview drag state if it was active during pinch
+	finishPreviewDrag();
+
 	// Check for tooltip on center pixel when pinching ends
 	checkCenterPixelTooltip();
 }
 
 async function handleTap(event: HammerInput) {
 	if (event.pointerType !== 'touch') return;
+
+	// If we had a drag operation that moved, don't handle as tap
+	if (previewDragState.hasMoved) {
+		return;
+	}
+
 	// Handle tap for pixel placement (similar to mouse click)
 	if (state.selectedColor) {
 		const worldPos = screenToWorld(event.center.x, event.center.y);
@@ -328,17 +464,22 @@ async function handlePointerDown(event: PIXI.FederatedPointerEvent) {
 
 	const globalPos = event.global;
 
-	// Check if pixel modal should be shown first (for non-preview mode)
-	if (!state.previewState.isActive && event.button === 0) {
-		const worldPos = screenToWorld(globalPos.x, globalPos.y);
-		const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
-		if (pixelInfo) {
-			showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile, pixelInfo.timestamp);
-			return; // Modal was shown, don't handle preview pixel placement
-		}
-	}
-
 	if (event.button === 0) { // Left click (mouse)
+		// Try to start preview pixel dragging first
+		if (startPreviewDrag(globalPos.x, globalPos.y)) {
+			return;
+		}
+
+		// Check if pixel modal should be shown first (for non-preview mode)
+		if (!state.previewState.isActive) {
+			const worldPos = screenToWorld(globalPos.x, globalPos.y);
+			const pixelInfo = await checkPixelClick(worldPos.x, worldPos.y);
+			if (pixelInfo) {
+				showPixelModal(pixelInfo.message, pixelInfo.url, pixelInfo.profile, pixelInfo.timestamp);
+				return; // Modal was shown, don't handle preview pixel placement
+			}
+		}
+
 		// For mouse: place pixel at cursor position in preview mode
 		if (state.pointerState.mouseCursorPixel && state.selectedColor) {
 			const pixelX = state.pointerState.mouseCursorPixel.x;
@@ -366,6 +507,11 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 	if (event.pointerType === 'touch') return;
 
 	const globalPos = event.global;
+
+	// Handle preview pixel dragging
+	if (updatePreviewDrag(globalPos.x, globalPos.y)) {
+		return;
+	}
 
 	if (state.pointerState.isDragging) {
 		// Handle camera panning for mouse
@@ -408,6 +554,23 @@ function handlePointerMove(event: PIXI.FederatedPointerEvent) {
 function handlePointerUp(event: PIXI.FederatedPointerEvent) {
 	// Only handle mouse events now (touch events are handled by Hammer.js)
 	if (event.pointerType === 'touch') return;
+
+	// Handle preview pixel dragging completion
+	const { wasDragging, hasMoved } = finishPreviewDrag();
+	if (wasDragging) {
+		if (!hasMoved) {
+			// This was a tap/click without drag, handle pixel placement/removal
+			const globalPos = event.global;
+			const worldPos = screenToWorld(globalPos.x, globalPos.y);
+			const pixelX = Math.floor(worldPos.x);
+			const pixelY = Math.floor(worldPos.y);
+
+			if (pixelX >= 0 && pixelX < WORLD_SIZE && pixelY >= 0 && pixelY < WORLD_SIZE && state.selectedColor) {
+				togglePreviewPixel(pixelX, pixelY, state.selectedColor);
+			}
+		}
+		return;
+	}
 
 	// Stop dragging for mouse events
 	state.updatePointerState({ isDragging: false });
@@ -461,6 +624,35 @@ function togglePreviewPixel(x: number, y: number, color: string) {
 		// No existing preview pixel, add new one
 		state.addPreviewPixel(x, y, color);
 	}
+}
+
+function moveAllPreviewPixels(worldDx: number, worldDy: number) {
+	if (state.previewState.pixels.size === 0) return;
+
+	// Get all current preview pixels
+	const currentPixels = Array.from(state.previewState.pixels.values());
+
+	// Clear current preview pixels
+	state.previewState.pixels.clear();
+
+	// Move each pixel and add back if within bounds
+	for (const pixel of currentPixels) {
+		const newX = pixel.x + worldDx;
+		const newY = pixel.y + worldDy;
+
+		// Only add the pixel back if it's within world bounds
+		if (newX >= 0 && newX < WORLD_SIZE && newY >= 0 && newY < WORLD_SIZE) {
+			const newPixelKey = `${newX},${newY}`;
+			state.previewState.pixels.set(newPixelKey, {
+				x: newX,
+				y: newY,
+				color: pixel.color
+			});
+		}
+	}
+
+	// Update cost breakdown after moving pixels
+	state.updateCostBreakdown();
 }
 
 // Add hover detection for pixel messages

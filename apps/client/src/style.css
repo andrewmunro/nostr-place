@@ -636,15 +636,8 @@ body.preview-active.preview-minimized #color-palette-container {
 .minimize-btn {
 	background: #6b7280;
 	color: white;
-	padding: 8px 12px;
-	min-width: auto;
-	height: auto;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 14px;
-	font-weight: bold;
-	line-height: 1;
+	padding-left: 30px !important;
+	padding-right: 30px !important;
 }
 
 .minimize-btn:hover {
@@ -737,6 +730,8 @@ body.preview-active.preview-minimized #color-palette-container {
 	font-weight: bold;
 	cursor: pointer;
 	transition: all 0.15s ease;
+	white-space: nowrap;
+	margin-left: 20px;
 }
 
 .preview-btn:hover {
