@@ -1,9 +1,11 @@
 <div align="center">
   <a href="https://zappy-place.pages.dev">
-    <img src="https://blossom.primal.net/b6850c80549f05eb5d84ab35421808d8cea0d6a496e2baad5a16dbb0ba565100.png " alt="Zappy Place" width="200" />
+    <img src="docs/zappy-place-logo.png" alt="Zappy Place" width="200" />
 
   <h1><b>🎨 zappy-place</b></h1>  </a>
   <strong>A fully decentralized, censorship-resistant pixel canvas inspired by Reddit Place — powered by <a href="https://nostr.com">Nostr</a></strong>
+  <br><br>
+  <img src="docs/desktop-screenshot.png" alt="Zappy Place" width="600" />
 </div>
 
 ## Inspiration
