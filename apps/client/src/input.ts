@@ -387,27 +387,24 @@ function handleKeyDown(event: KeyboardEvent) {
 		(activeElement as HTMLElement).contentEditable === 'true'
 	);
 
-	// Zoom controls (zoom to center) - allow these even when typing
-	if (event.key === '=' || event.key === '+') {
-		event.preventDefault();
-		const centerX = state.app.screen.width / 2;
-		const centerY = state.app.screen.height / 2;
-		const newScale = state.camera.scale * 1.2;
-		smoothZoomToPoint(newScale, centerX, centerY);
-	} else if (event.key === '-' || event.key === '_') {
-		event.preventDefault();
-		const centerX = state.app.screen.width / 2;
-		const centerY = state.app.screen.height / 2;
-		const newScale = state.camera.scale / 1.2;
-		smoothZoomToPoint(newScale, centerX, centerY);
-	}
-
 	// Skip WASD camera movement if user is typing in an input field
 	if (!isTyping) {
 		// Camera movement (WASD or Arrow keys)
 		const moveSpeed = 50 / state.camera.scale; // Slower movement when zoomed in
 
-		if (event.key === 'w' || event.key === 'W' || event.key === 'ArrowUp') {
+		if (event.key === '=' || event.key === '+') {
+			event.preventDefault();
+			const centerX = state.app.screen.width / 2;
+			const centerY = state.app.screen.height / 2;
+			const newScale = state.camera.scale * 1.2;
+			smoothZoomToPoint(newScale, centerX, centerY);
+		} else if (event.key === '-' || event.key === '_') {
+			event.preventDefault();
+			const centerX = state.app.screen.width / 2;
+			const centerY = state.app.screen.height / 2;
+			const newScale = state.camera.scale / 1.2;
+			smoothZoomToPoint(newScale, centerX, centerY);
+		} else if (event.key === 'w' || event.key === 'W' || event.key === 'ArrowUp') {
 			event.preventDefault();
 			state.updateCamera({
 				y: state.camera.y - moveSpeed

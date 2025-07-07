@@ -246,6 +246,46 @@
 		</div>
 	</div>
 
+	<!-- Share Design Modal -->
+	<div id="share-modal" class="share-modal hidden">
+		<div class="share-modal-content">
+			<div class="share-modal-header">
+				<h2>🎉 Design Submitted!</h2>
+				<button class="share-modal-close" id="share-modal-close">×</button>
+			</div>
+			<div class="share-modal-body">
+				<p>Your pixel art has been successfully submitted to the canvas! Want to share it with the world?</p>
+
+				<div class="share-preview">
+					<canvas id="share-screenshot" class="share-screenshot"></canvas>
+				</div>
+
+				<div class="share-inputs">
+					<div class="input-group">
+						<label for="share-message">📝 Share Message</label>
+						<textarea id="share-message" placeholder="Check out my pixel art on Zappy Place!"
+							maxlength="280" rows="3"></textarea>
+						<small class="input-help">Customize your message (max 280 characters)</small>
+					</div>
+
+					<div class="share-link-preview">
+						<label>🔗 Share Link</label>
+						<div class="link-container">
+							<input type="text" id="share-link" readonly>
+							<button id="copy-link-btn" class="copy-btn" title="Copy link">📋</button>
+						</div>
+						<small class="input-help">Direct link to your design with perfect zoom level</small>
+					</div>
+				</div>
+
+				<div class="share-actions">
+					<button id="share-skip" class="preview-btn cancel-btn">Skip</button>
+					<button id="share-to-nostr" class="preview-btn submit-btn">Share to Nostr</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
 	<div class="footer">
 		<!-- GitHub Button -->
 		<!-- <a class="github-button" href="https://github.com/andrewmunro/zappy-place"

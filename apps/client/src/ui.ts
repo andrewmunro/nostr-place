@@ -3,6 +3,8 @@ import { npubEncode } from 'nostr-tools/nip19';
 import { getCenterPixel, zoomIn, zoomOut } from './camera';
 import { PRESET_COLORS } from './constants';
 import { nostrService } from './nostr';
+import { generateShareableURL } from './persistence';
+import { captureDesignScreenshot } from './renderer';
 import { state } from './state';
 import { throttle } from './utils';
 
@@ -39,6 +41,7 @@ export function setupUI() {
 	setupTutorial();
 	setupPixelTooltip();
 	setupPixelModal();
+	setupShareModal();
 
 	// Show tutorial for first-time users
 	if (isFirstTimeUser()) {
@@ -662,4 +665,142 @@ export function showPixelModal(message?: string, url?: string, profile?: NostrPr
 export function hidePixelModal() {
 	const pixelModal = document.getElementById('pixel-modal')!;
 	pixelModal.classList.add('hidden');
+}
+
+function setupShareModal() {
+	const shareModal = document.getElementById('share-modal')!;
+	const shareModalClose = document.getElementById('share-modal-close')!;
+	const shareSkipBtn = document.getElementById('share-skip')!;
+	const shareToNostrBtn = document.getElementById('share-to-nostr')! as HTMLButtonElement;
+	const copyLinkBtn = document.getElementById('copy-link-btn')!;
+	const shareMessageInput = document.getElementById('share-message')! as HTMLTextAreaElement;
+
+	// Close modal handlers
+	shareModalClose.addEventListener('click', hideShareModal);
+	shareSkipBtn.addEventListener('click', hideShareModal);
+
+	// Close modal when clicking outside
+	shareModal.addEventListener('click', (event) => {
+		if (event.target === shareModal) {
+			hideShareModal();
+		}
+	});
+
+	// Close modal when pressing escape
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && !shareModal.classList.contains('hidden')) {
+			hideShareModal();
+		}
+	});
+
+	// Copy link functionality
+	copyLinkBtn.addEventListener('click', async () => {
+		const linkInput = document.getElementById('share-link')! as HTMLInputElement;
+		try {
+			await navigator.clipboard.writeText(linkInput.value);
+			copyLinkBtn.textContent = '✓';
+			copyLinkBtn.classList.add('copied');
+			setTimeout(() => {
+				copyLinkBtn.textContent = '📋';
+				copyLinkBtn.classList.remove('copied');
+			}, 2000);
+		} catch (error) {
+			console.warn('Failed to copy to clipboard:', error);
+			// Fallback: select the text
+			linkInput.select();
+			linkInput.setSelectionRange(0, 99999);
+		}
+	});
+
+	// Share to Nostr functionality
+	shareToNostrBtn.addEventListener('click', async () => {
+		try {
+			shareToNostrBtn.disabled = true;
+			shareToNostrBtn.textContent = 'Sharing...';
+
+			const message = shareMessageInput.value.trim();
+			const shareLink = (document.getElementById('share-link')! as HTMLInputElement).value;
+			const screenshot = (document.getElementById('share-screenshot')! as HTMLCanvasElement).toDataURL('image/png');
+
+			// Create the full message with link
+			const fullMessage = message + '\n\n' + shareLink;
+
+			// Publish to Nostr
+			await nostrService.canvas.publishNote(fullMessage, screenshot);
+
+			// Show success state
+			shareToNostrBtn.textContent = 'Shared! ✓';
+			shareToNostrBtn.style.background = '#28a745';
+
+			// Close modal after a short delay
+			setTimeout(() => {
+				hideShareModal();
+			}, 1500);
+
+		} catch (error) {
+			console.error('Failed to share to Nostr:', error);
+
+			// Show error state
+			shareToNostrBtn.textContent = 'Failed to share';
+			shareToNostrBtn.style.background = '#dc3545';
+
+			// Reset after delay
+			setTimeout(() => {
+				shareToNostrBtn.disabled = false;
+				shareToNostrBtn.textContent = 'Share to Nostr';
+				shareToNostrBtn.style.background = '';
+			}, 3000);
+		}
+	});
+
+	// Character counter for message
+	shareMessageInput.addEventListener('input', () => {
+		const helpText = shareMessageInput.parentElement?.querySelector('.input-help') as HTMLElement;
+		if (helpText) {
+			const remaining = 280 - shareMessageInput.value.length;
+			helpText.textContent = `Customize your message (${remaining} characters remaining)`;
+			helpText.style.color = remaining < 20 ? '#dc3545' : '';
+		}
+	});
+}
+
+export function showShareModal(pixelCoords: Array<{ x: number, y: number }>) {
+	const shareModal = document.getElementById('share-modal')!;
+	const shareMessageInput = document.getElementById('share-message')! as HTMLTextAreaElement;
+	const shareLinkInput = document.getElementById('share-link')! as HTMLInputElement;
+	const shareScreenshotCanvas = document.getElementById('share-screenshot')! as HTMLCanvasElement;
+	const shareToNostrBtn = document.getElementById('share-to-nostr')! as HTMLButtonElement;
+
+	// Generate screenshot
+	const screenshotDataUrl = captureDesignScreenshot(pixelCoords);
+	if (screenshotDataUrl) {
+		const img = new Image();
+		img.onload = () => {
+			shareScreenshotCanvas.width = img.width;
+			shareScreenshotCanvas.height = img.height;
+			const ctx = shareScreenshotCanvas.getContext('2d')!;
+			ctx.drawImage(img, 0, 0);
+		};
+		img.src = screenshotDataUrl;
+	}
+
+	// Generate shareable URL
+	const shareableURL = generateShareableURL(pixelCoords);
+	shareLinkInput.value = shareableURL;
+
+	// Set default message
+	shareMessageInput.value = 'Check out my pixel art on Zappy Place! 🎨⚡\n\n#zappyplace';
+
+	// Reset button state
+	shareToNostrBtn.disabled = false;
+	shareToNostrBtn.textContent = 'Share to Nostr';
+	shareToNostrBtn.style.background = '';
+
+	// Show modal
+	shareModal.classList.remove('hidden');
+}
+
+export function hideShareModal() {
+	const shareModal = document.getElementById('share-modal')!;
+	shareModal.classList.add('hidden');
 }

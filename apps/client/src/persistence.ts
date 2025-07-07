@@ -71,4 +71,37 @@ export function loadFromURL() {
 			console.warn('Failed to decode preview pixels from URL:', error);
 		}
 	}
+}
+
+export function generateShareableURL(pixelCoords: Array<{ x: number, y: number }>, customScale?: number): string {
+	if (pixelCoords.length === 0) return window.location.origin;
+
+	// Calculate center of the design
+	const minX = Math.min(...pixelCoords.map(p => p.x));
+	const maxX = Math.max(...pixelCoords.map(p => p.x));
+	const minY = Math.min(...pixelCoords.map(p => p.y));
+	const maxY = Math.max(...pixelCoords.map(p => p.y));
+
+	const centerX = Math.floor((minX + maxX) / 2);
+	const centerY = Math.floor((minY + maxY) / 2);
+
+	// Calculate appropriate zoom level if not provided
+	let scale = customScale;
+	if (!scale) {
+		const designWidth = maxX - minX + 1;
+		const designHeight = maxY - minY + 1;
+		const maxDimension = Math.max(designWidth, designHeight);
+
+		// Aim for design to take up about 1/3 of screen (assuming ~800px screen)
+		const targetPixelSize = 250 / maxDimension;
+		scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, targetPixelSize));
+	}
+
+	// Create URL parameters
+	const params = new URLSearchParams();
+	params.set('x', centerX.toString());
+	params.set('y', centerY.toString());
+	params.set('scale', scale.toFixed(2));
+
+	return `https://zappy-place.pages.dev/#${params.toString()}`;
 } 

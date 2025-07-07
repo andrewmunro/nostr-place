@@ -1,6 +1,6 @@
 import { NostrCanvas, NostrClientConfig, PixelEvent } from '@zappy-place/nostr-client';
 import { state } from './state';
-import { setConnectionStatus, setUserInfo } from './ui';
+import { setConnectionStatus, setUserInfo, showShareModal } from './ui';
 
 function isDebugMode(): boolean {
 	const urlParams = new URLSearchParams(window.location.search);
@@ -76,15 +76,28 @@ class NostrService {
 
 		if (isDebugMode()) {
 			this.handlePixelUpdate(pixelEvent);
+			// Get pixel coordinates for sharing before clearing preview
+			const pixelCoords = Array.from(state.previewState.pixels.values()).map(p => ({ x: p.x, y: p.y }));
+
+			// Clear preview after successful submission
 			state.exitPreviewMode();
+
+			// Show share modal to prompt user to share their design
+			showShareModal(pixelCoords);
 			return;
 		}
 
 		try {
 			await this.canvas.publishPixelEvent(pixelEvent, isFreePlacement());
 
+			// Get pixel coordinates for sharing before clearing preview
+			const pixelCoords = Array.from(state.previewState.pixels.values()).map(p => ({ x: p.x, y: p.y }));
+
 			// Clear preview after successful submission
 			state.exitPreviewMode();
+
+			// Show share modal to prompt user to share their design
+			showShareModal(pixelCoords);
 		} catch (error) {
 			console.error('Failed to submit preview pixels:', error);
 			throw error;

@@ -343,3 +343,59 @@ function renderCursor() {
 		}
 	}
 }
+
+export function captureDesignScreenshot(pixelCoords: Array<{ x: number, y: number }>): string {
+	if (pixelCoords.length === 0) return '';
+
+	// Calculate bounding box of the design
+	const minX = Math.min(...pixelCoords.map(p => p.x));
+	const maxX = Math.max(...pixelCoords.map(p => p.x));
+	const minY = Math.min(...pixelCoords.map(p => p.y));
+	const maxY = Math.max(...pixelCoords.map(p => p.y));
+
+	// Add some padding around the design
+	const padding = 5;
+	const boundingMinX = Math.max(0, minX - padding);
+	const boundingMaxX = Math.min(WORLD_SIZE - 1, maxX + padding);
+	const boundingMinY = Math.max(0, minY - padding);
+	const boundingMaxY = Math.min(WORLD_SIZE - 1, maxY + padding);
+
+	const width = boundingMaxX - boundingMinX + 1;
+	const height = boundingMaxY - boundingMinY + 1;
+
+	// Create a temporary canvas for the screenshot
+	const canvas = document.createElement('canvas');
+	const ctx = canvas.getContext('2d')!;
+
+	// Set canvas size with pixel scale for crisp rendering
+	const pixelScale = 8; // Scale up each pixel for better visibility
+	canvas.width = width * pixelScale;
+	canvas.height = height * pixelScale;
+
+	// Disable image smoothing for crisp pixels
+	ctx.imageSmoothingEnabled = false;
+
+	// Fill background with light gray
+	ctx.fillStyle = '#f0f0f0';
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+	// Draw pixels from the state instead of trying to read from canvas
+	for (let x = boundingMinX; x <= boundingMaxX; x++) {
+		for (let y = boundingMinY; y <= boundingMaxY; y++) {
+			// Get pixel from state (includes both existing and newly submitted pixels)
+			const pixelKey = `${x},${y}`;
+			const pixel = state.pixels.get(pixelKey);
+
+			if (pixel && pixel.color) {
+				ctx.fillStyle = pixel.color;
+
+				const screenX = (x - boundingMinX) * pixelScale;
+				const screenY = (y - boundingMinY) * pixelScale;
+				ctx.fillRect(screenX, screenY, pixelScale, pixelScale);
+			}
+		}
+	}
+
+	// Convert canvas to data URL
+	return canvas.toDataURL('image/png');
+}

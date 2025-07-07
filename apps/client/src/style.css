@@ -1259,6 +1259,163 @@ body.preview-active.preview-minimized #color-palette-container {
 	white-space: nowrap;
 }
 
+/* Share Design Modal Styles */
+.share-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.8);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	pointer-events: auto;
+}
+
+.share-modal.hidden {
+	display: none;
+}
+
+.share-modal-content {
+	background: white;
+	border-radius: 12px;
+	padding: 0;
+	max-width: 500px;
+	width: 90%;
+	max-height: 90vh;
+	overflow-y: auto;
+	position: relative;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+	animation: modalFadeIn 0.3s ease-out;
+}
+
+.share-modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 24px 24px 16px;
+	border-bottom: 1px solid #eee;
+}
+
+.share-modal-header h2 {
+	margin: 0;
+	color: #333;
+	font-size: 24px;
+}
+
+.share-modal-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: #666;
+	padding: 0;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	transition: all 0.15s ease;
+}
+
+.share-modal-close:hover {
+	background: #f0f0f0;
+	color: #333;
+}
+
+.share-modal-body {
+	padding: 24px;
+}
+
+.share-modal-body p {
+	margin: 0 0 20px 0;
+	color: #666;
+	line-height: 1.5;
+}
+
+.share-preview {
+	display: flex;
+	justify-content: center;
+	margin-bottom: 24px;
+	padding: 16px;
+	background: #f8f9fa;
+	border-radius: 8px;
+	border: 2px dashed #ddd;
+}
+
+.share-screenshot {
+	max-width: 200px;
+	max-height: 200px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	image-rendering: pixelated;
+	image-rendering: -moz-crisp-edges;
+	image-rendering: crisp-edges;
+}
+
+.share-inputs {
+	margin-bottom: 24px;
+}
+
+.share-link-preview {
+	margin-top: 16px;
+}
+
+.link-container {
+	display: flex;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.link-container input {
+	flex: 1;
+	padding: 8px 12px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	font-size: 14px;
+	font-family: 'Courier New', monospace;
+	background: #f8f9fa;
+	color: #666;
+}
+
+.copy-btn {
+	padding: 8px 12px;
+	background: #007acc;
+	color: white;
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 14px;
+	transition: all 0.15s ease;
+	white-space: nowrap;
+}
+
+.copy-btn:hover {
+	background: #005a99;
+	transform: scale(1.05);
+}
+
+.copy-btn:active {
+	transform: scale(0.95);
+}
+
+.copy-btn.copied {
+	background: #28a745;
+}
+
+.share-actions {
+	display: flex;
+	gap: 12px;
+}
+
+.share-actions .preview-btn {
+	margin-left: 0;
+	flex: 1;
+}
+
 .pixel-modal-url {
 	font-size: 14px;
 }

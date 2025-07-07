@@ -1,5 +1,6 @@
+import { PixelData } from '@zappy-place/nostr-client';
 import { PRESET_COLORS } from './constants';
-import { PixelData, state } from './state';
+import { state } from './state';
 
 export function isDebugMode(): boolean {
 	const urlParams = new URLSearchParams(window.location.search);
@@ -73,20 +74,19 @@ function generateDummyPixels(): Map<string, PixelData> {
 	drawCornerMarker(pixels, 50, 1950, PRESET_COLORS[54]!); // blue
 	drawCornerMarker(pixels, 1950, 1950, PRESET_COLORS[22]!); // yellow
 
-	// 6. Add test pixels with messages and URLs for tooltip/modal testing
-	// Create some pixels with messages near the center
-	setPixel(pixels, 1000, 1000, PRESET_COLORS[29]!, "🚀 Welcome to Zappy Place!", "https://github.com/andrewmunro/zappy-place");
-	setPixel(pixels, 1001, 1000, PRESET_COLORS[13]!, "This is a test message for the tooltip system. Hover over me!", undefined);
-	setPixel(pixels, 1002, 1000, PRESET_COLORS[54]!, "Click me to see the modal!", "https://nostr.com");
-	setPixel(pixels, 1003, 1000, PRESET_COLORS[22]!, undefined, "https://bitcoin.org");
-	setPixel(pixels, 1004, 1000, PRESET_COLORS[8]!, "🎨 Collaborative pixel art powered by Nostr + Lightning!", "https://zappy.place");
+	// 6. Add test pixels near the center for testing
+	setPixel(pixels, 1000, 1000, PRESET_COLORS[29]!);
+	setPixel(pixels, 1001, 1000, PRESET_COLORS[13]!);
+	setPixel(pixels, 1002, 1000, PRESET_COLORS[54]!);
+	setPixel(pixels, 1003, 1000, PRESET_COLORS[22]!);
+	setPixel(pixels, 1004, 1000, PRESET_COLORS[8]!);
 
-	// Create a small cluster of message pixels
-	setPixel(pixels, 500, 500, PRESET_COLORS[12]!, "🔥 This is awesome!", undefined);
-	setPixel(pixels, 501, 500, PRESET_COLORS[15]!, "💎 HODL Bitcoin!", "https://bitcoin.org");
-	setPixel(pixels, 502, 500, PRESET_COLORS[18]!, "⚡ Lightning fast!", undefined);
-	setPixel(pixels, 500, 501, PRESET_COLORS[21]!, "🌈 So many colors!", undefined);
-	setPixel(pixels, 501, 501, PRESET_COLORS[24]!, "Check out our repo!", "https://github.com/andrewmunro/zappy-place");
+	// Create a small cluster of test pixels
+	setPixel(pixels, 500, 500, PRESET_COLORS[12]!);
+	setPixel(pixels, 501, 500, PRESET_COLORS[15]!);
+	setPixel(pixels, 502, 500, PRESET_COLORS[18]!);
+	setPixel(pixels, 500, 501, PRESET_COLORS[21]!);
+	setPixel(pixels, 501, 501, PRESET_COLORS[24]!);
 
 	console.log(`Generated ${pixels.size} dummy pixels for testing`);
 	return pixels;
@@ -259,14 +259,12 @@ function drawCornerMarker(pixels: Map<string, PixelData>, x: number, y: number, 
 	}
 }
 
-function setPixel(pixels: Map<string, PixelData>, x: number, y: number, color: string, message?: string, url?: string) {
+function setPixel(pixels: Map<string, PixelData>, x: number, y: number, color: string) {
 	if (x >= 0 && x < 2000 && y >= 0 && y < 2000) {
 		const pixel: PixelData = {
 			x,
 			y,
-			color,
-			message,
-			url
+			color
 		};
 		pixels.set(`${x},${y}`, pixel);
 	}

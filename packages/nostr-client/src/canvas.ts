@@ -207,6 +207,53 @@ export class NostrCanvas extends NostrClient {
 		}
 	}
 
+	// Publish a regular note (kind 1) for sharing designs
+	async publishNote(content: string, imageData?: string): Promise<string> {
+		if (!this.isConnected) {
+			throw new Error('No connected relays');
+		}
+
+		if (!window.nostr) {
+			throw new Error('Nostr extension not available');
+		}
+
+		const noteEvent: NostrEvent = {
+			kind: 1,
+			created_at: Math.floor(Date.now() / 1000),
+			content,
+			tags: [
+				['app', 'Zappy Place'],
+				['t', 'pixelart'],
+				['t', 'nostr'],
+				['t', 'zappyplace']
+			],
+			pubkey: '',
+			id: '',
+			sig: ''
+		};
+
+		// Add image as a tag if provided
+		if (imageData) {
+			noteEvent.tags.push(['image', imageData]);
+		}
+
+		try {
+			const signedEvent = await window.nostr.signEvent(noteEvent);
+
+			// Publish to all connected relays
+			const publishPromises = this.connectedRelays.map(relay =>
+				this.pool.publish([relay], signedEvent)
+			);
+
+			await Promise.all(publishPromises);
+
+			return signedEvent.id;
+		} catch (error) {
+			console.error('Failed to publish note:', error);
+			throw new Error('Failed to publish note to Nostr');
+		}
+	}
+
 	calculateCost(pixels: Array<{ x: number; y: number; color: string }>): CostBreakdown {
 		const previewPixels: PreviewPixel[] = pixels.map(p => {
 			const existingPixel = this.getPixelEvent(p.x, p.y);
